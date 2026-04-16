@@ -1,0 +1,4 @@
+/internal/config/development.yaml
+/internal/config/production.yaml
+.gocache
+tmp

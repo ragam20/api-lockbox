@@ -1,0 +1,26 @@
+name: lockbox-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lockbox-postgres-dev
+    restart: no
+    environment:
+      POSTGRES_DB: lockbox_dev_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      TZ: UTC
+
+    ports:
+      - "5432:5432"
+    volumes:
+      - lockbox-postgres-dev-data:/var/lib/postgres/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lockbox_dev_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  lockbox-postgres-dev-data:
