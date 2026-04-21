@@ -1,0 +1,44 @@
+package config
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/rs/zerolog"
+)
+
+func (e *Env) Validate() error {
+	var errs []string
+
+	validateAppConfig(e.App, &errs)
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("invalid config: %s", strings.Join(errs, "; "))
+}
+
+func validateAppConfig(cfg AppConfig, errs *[]string) {
+	if strings.TrimSpace(cfg.Env) == "" {
+		*errs = append(*errs, "app.env is required")
+	}
+
+	if strings.TrimSpace(cfg.Version) == "" {
+		*errs = append(*errs, "app.version is required")
+	}
+
+	if cfg.Port <= 0 || cfg.Port > 65535 {
+		*errs = append(*errs, "app.port must be between 1 and 65535")
+	}
+
+	if strings.TrimSpace(cfg.LogLevel) == "" {
+		*errs = append(*errs, "app.log_level is required")
+	} else if _, err := zerolog.ParseLevel(cfg.LogLevel); err != nil {
+		*errs = append(*errs, "app.log_level is invalid")
+	}
+
+	if cfg.RequestTimeout <= 0 {
+		*errs = append(*errs, "app.request_timeout must be > 0")
+	}
+}
