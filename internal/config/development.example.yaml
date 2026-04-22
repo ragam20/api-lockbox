@@ -2,6 +2,7 @@ app:
   env:
   version:
   log_level:
+  node_id:
   port:
   request_timeout:
   allowed_origins:

@@ -39,6 +39,10 @@ func validateAppConfig(cfg AppConfig, errs *[]string) {
 		*errs = append(*errs, "app.log_level is invalid")
 	}
 
+	if cfg.NodeID < 0 {
+		*errs = append(*errs, "app.node_id must be >= 0")
+	}
+
 	if cfg.RequestTimeout <= 0 {
 		*errs = append(*errs, "app.request_timeout must be > 0")
 	}

@@ -9,6 +9,7 @@ import (
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/router"
 	"lockbox/internal/http/server"
+	"lockbox/internal/idgen"
 	"lockbox/internal/logger"
 
 	"go.uber.org/fx"
@@ -33,6 +34,7 @@ func main() {
 
 	infraModule := fx.Module("infra",
 		fx.Provide(
+			idgen.NewSnowflakeGen,
 			logger.NewLogger,
 		),
 	)
