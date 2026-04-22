@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"lockbox/internal/config"
+	"lockbox/internal/database"
 	appHttp "lockbox/internal/http"
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/router"
@@ -11,6 +12,7 @@ import (
 	"lockbox/internal/logger"
 
 	"go.uber.org/fx"
+	"gorm.io/gorm"
 )
 
 func main() {
@@ -19,6 +21,13 @@ func main() {
 			config.NewEnv,
 			config.NewConfig,
 			config.NewAppConfig,
+			config.NewDatabaseConfig,
+		),
+	)
+
+	databaseModule := fx.Module("database",
+		fx.Provide(
+			database.NewPostgresConnection,
 		),
 	)
 
@@ -43,11 +52,12 @@ func main() {
 
 	app := fx.New(fx.Options(
 		configModule,
+		databaseModule,
 		infraModule,
 		appHTTPModule,
 
 		fx.Invoke(
-			func(_ *http.Server, _ *appHttp.CookieManager) {},
+			func(_ *http.Server, _ *appHttp.CookieManager, _ *gorm.DB) {},
 			router.NewRoutes,
 		),
 	))

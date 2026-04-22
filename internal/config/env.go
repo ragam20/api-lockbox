@@ -12,7 +12,8 @@ import (
 )
 
 type Env struct {
-	App AppConfig `mapstructure:"app"`
+	App      AppConfig      `mapstructure:"app"`
+	Database DatabaseConfig `mapstructure:"db"`
 }
 
 func NewEnv() (*Env, error) {
@@ -94,5 +95,7 @@ func getKeys() []string {
 		"app.port",
 		"app.request_timeout",
 		"app.version",
+
+		"db.url",
 	}
 }
