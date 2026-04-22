@@ -70,6 +70,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.version", "dev")
 	v.SetDefault("app.port", 8000)
 	v.SetDefault("app.log_level", "debug")
+	v.SetDefault("app.node_id", 0)
 	v.SetDefault("app.request_timeout", 5*time.Second)
 	v.SetDefault("app.allowed_origins", []string{"http://localhost:5173"})
 }
@@ -92,6 +93,7 @@ func getKeys() []string {
 		"app.allowed_origins",
 		"app.env",
 		"app.log_level",
+		"app.node_id",
 		"app.port",
 		"app.request_timeout",
 		"app.version",

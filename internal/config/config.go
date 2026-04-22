@@ -7,6 +7,7 @@ type AppConfig struct {
 	Version        string        `mapstructure:"version"`
 	Port           int           `mapstructure:"port"`
 	LogLevel       string        `mapstructure:"log_level"`
+	NodeID         int64         `mapstructure:"node_id"`
 	RequestTimeout time.Duration `mapstructure:"request_timeout"`
 	AllowedOrigins []string      `mapstructure:"allowed_origins"`
 }
