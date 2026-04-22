@@ -11,16 +11,26 @@ type AppConfig struct {
 	AllowedOrigins []string      `mapstructure:"allowed_origins"`
 }
 
+type DatabaseConfig struct {
+	URL string `mapstructure:"url"`
+}
+
 type Config struct {
-	App AppConfig
+	App      AppConfig
+	Database DatabaseConfig
 }
 
 func NewConfig(env *Env) *Config {
 	return &Config{
-		App: env.App,
+		App:      env.App,
+		Database: env.Database,
 	}
 }
 
 func NewAppConfig(cfg *Config) *AppConfig {
 	return &cfg.App
+}
+
+func NewDatabaseConfig(cfg *Config) *DatabaseConfig {
+	return &cfg.Database
 }

@@ -11,6 +11,7 @@ func (e *Env) Validate() error {
 	var errs []string
 
 	validateAppConfig(e.App, &errs)
+	validateDatabaseConfig(e.Database, &errs)
 
 	if len(errs) == 0 {
 		return nil
@@ -40,5 +41,11 @@ func validateAppConfig(cfg AppConfig, errs *[]string) {
 
 	if cfg.RequestTimeout <= 0 {
 		*errs = append(*errs, "app.request_timeout must be > 0")
+	}
+}
+
+func validateDatabaseConfig(cfg DatabaseConfig, errs *[]string) {
+	if strings.TrimSpace(cfg.URL) == "" {
+		*errs = append(*errs, "db.url is required")
 	}
 }

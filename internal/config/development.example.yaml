@@ -1,8 +1,11 @@
 app:
-  env: development
-  version: dev
-  log_level: debug
-  port: 8000
-  request_timeout: 5s
+  env:
+  version:
+  log_level:
+  port:
+  request_timeout:
   allowed_origins:
-    - http://localhost:5173
+    -
+
+db:
+  url:
