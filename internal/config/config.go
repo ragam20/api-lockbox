@@ -16,9 +16,15 @@ type DatabaseConfig struct {
 	URL string `mapstructure:"url"`
 }
 
+type JWTConfig struct {
+	Secret  string        `mapstructure:"secret"`
+	Expired time.Duration `mapstructure:"expired"`
+}
+
 type Config struct {
-	App      AppConfig
-	Database DatabaseConfig
+	App       AppConfig
+	Database  DatabaseConfig
+	JWTConfig JWTConfig
 }
 
 func NewConfig(env *Env) *Config {
@@ -34,4 +40,8 @@ func NewAppConfig(cfg *Config) *AppConfig {
 
 func NewDatabaseConfig(cfg *Config) *DatabaseConfig {
 	return &cfg.Database
+}
+
+func NewJWTConfig(cfg *Config) *JWTConfig {
+	return &cfg.JWTConfig
 }

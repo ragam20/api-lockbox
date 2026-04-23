@@ -12,8 +12,9 @@ import (
 )
 
 type Env struct {
-	App      AppConfig      `mapstructure:"app"`
-	Database DatabaseConfig `mapstructure:"db"`
+	App       AppConfig      `mapstructure:"app"`
+	Database  DatabaseConfig `mapstructure:"db"`
+	JWTConfig JWTConfig      `mapstructure:"jwt"`
 }
 
 func NewEnv() (*Env, error) {
@@ -97,6 +98,9 @@ func getKeys() []string {
 		"app.port",
 		"app.request_timeout",
 		"app.version",
+
+		"jwt.secret",
+		"jwt.expired",
 
 		"db.url",
 	}
