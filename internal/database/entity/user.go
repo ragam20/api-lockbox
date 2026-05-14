@@ -5,11 +5,10 @@ import "time"
 type UserEntity struct {
 	ID int64 `gorm:"primaryKey"`
 
-	Name   string `gorm:"size:255;not null"`
-	Email  string `gorm:"size:255;not null;uniqueIndex"`
-	ImgURL *string
-
-	GoogleID *int64
+	Name          string `gorm:"size:255;not null"`
+	Email         string `gorm:"size:255;not null;uniqueIndex"`
+	EmailVerified bool
+	ImgURL        *string
 
 	MasterKeySalt string `gorm:"type:text;not null"`
 
