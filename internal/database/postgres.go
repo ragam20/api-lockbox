@@ -34,9 +34,10 @@ func NewPostgresConnection(cfg *config.DatabaseConfig, appCfg *config.AppConfig,
 	if appCfg.Env == "development" {
 		if err := db.AutoMigrate(
 			entity.UserEntity{},
+			entity.ArgonConfigEntity{},
 			entity.VaultEntity{},
 			entity.VaultItemEntity{},
-			entity.SessionEntity{},
+			entity.UserSessionEntity{},
 		); err != nil {
 			log.Error("failed to migrate", err, map[string]any{})
 			return nil, err
