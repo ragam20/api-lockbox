@@ -5,8 +5,18 @@ app:
   node_id:
   port:
   request_timeout:
+  frontend_url:
   allowed_origins:
     -
 
+smtp:
+  port:
+  host:
+  user:
+  pass:
+
 db:
+  url:
+
+redis:
   url:

@@ -27,7 +27,8 @@ func (m *RequestTimeoutMiddleware) Handle() gin.HandlerFunc {
 		c.Next()
 
 		if ctx.Err() == context.DeadlineExceeded {
-			c.AbortWithStatusJSON(http.StatusBadGateway, response.NewAppErr(http.StatusBadGateway, "request timeout"))
+			appErr := response.NewAppErr(http.StatusBadGateway, "request timeout")
+			c.AbortWithStatusJSON(appErr.Status, response.Error(appErr.Status, appErr.Message, appErr.Timestamp))
 		}
 	}
 }

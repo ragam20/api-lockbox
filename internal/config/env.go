@@ -12,9 +12,11 @@ import (
 )
 
 type Env struct {
-	App       AppConfig      `mapstructure:"app"`
-	Database  DatabaseConfig `mapstructure:"db"`
-	JWTConfig JWTConfig      `mapstructure:"jwt"`
+	App         AppConfig      `mapstructure:"app"`
+	Database    DatabaseConfig `mapstructure:"db"`
+	JWTConfig   JWTConfig      `mapstructure:"jwt"`
+	RedisConfig RedisConfig    `mapstructure:"redis"`
+	SMTPConfig  SMTPConfig     `mapstructure:"smtp"`
 }
 
 func NewEnv() (*Env, error) {
@@ -74,6 +76,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.node_id", 0)
 	v.SetDefault("app.request_timeout", 5*time.Second)
 	v.SetDefault("app.allowed_origins", []string{"http://localhost:5173"})
+	v.SetDefault("app.frontend_url", "http://localhost:5173")
 }
 
 func isProduction(appEnv string) bool {
@@ -98,10 +101,18 @@ func getKeys() []string {
 		"app.port",
 		"app.request_timeout",
 		"app.version",
+		"app.frontend_url",
 
 		"jwt.secret",
 		"jwt.expired",
 
 		"db.url",
+
+		"redis.url",
+
+		"smtp.port",
+		"smtp.host",
+		"smtp.user",
+		"smtp.pass",
 	}
 }

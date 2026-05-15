@@ -52,7 +52,7 @@ func (m *ErrorMiddleware) Handle() gin.HandlerFunc {
 		}
 
 		c.AbortWithStatusJSON(status, gin.H{
-			"status":    status,
+			"success":   false,
 			"message":   msg,
 			"timestamp": timestamp,
 		})

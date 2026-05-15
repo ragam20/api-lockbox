@@ -21,7 +21,7 @@ type VaultEntity struct {
 	ID     int64 `gorm:"primaryKey"`
 	UserID int64 `gorm:"not null;index"`
 
-	Timeout     int32
+	Timeout     int32            `gorm:"default:10"`
 	TimeoutType VaultTimeoutType `gorm:"type:varchar(20);check:timeout_type IN ('lock', 'logout')"`
 
 	VaultKeySalt string `gorm:"type:text;not null"`
