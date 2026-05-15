@@ -2,20 +2,18 @@ package router
 
 import (
 	"net/http"
-	"time"
+
+	"lockbox/internal/http/handler"
+	"lockbox/internal/http/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-func NewRoutes(g *gin.Engine) {
+func NewRoutes(g *gin.Engine, authHandler *handler.AuthHandler) {
 	api := g.Group("/api")
 	{
 		api.GET("/ping", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"status":    http.StatusOK,
-				"message":   "pong",
-				"timestamp": time.Now().UTC(),
-			})
+			response.Success(c, http.StatusOK, "pong", nil)
 		})
 	}
 
@@ -23,19 +21,20 @@ func NewRoutes(g *gin.Engine) {
 		c.Status(http.StatusNoContent)
 	})
 
+	authAPI := api.Group("/auth")
+	{
+		authAPI.POST("/register/send-verification-link", authHandler.SendVerifyLink)
+		authAPI.GET("/register/verify-email", authHandler.VerifyEmail)
+		authAPI.POST("/register", authHandler.Register)
+	}
+
 	g.NoRoute(func(c *gin.Context) {
-		c.JSON(http.StatusNotFound, gin.H{
-			"status":    http.StatusNotFound,
-			"message":   "route not found",
-			"timestamp": time.Now().UTC(),
-		})
+		appErr := response.NotFoundError("route not found")
+		c.JSON(appErr.Status, response.Error(appErr.Status, appErr.Message, appErr.Timestamp))
 	})
 
 	g.NoMethod(func(c *gin.Context) {
-		c.JSON(http.StatusMethodNotAllowed, gin.H{
-			"status":    http.StatusMethodNotAllowed,
-			"message":   "method not allowed",
-			"timestamp": time.Now().UTC(),
-		})
+		appErr := response.NewAppErr(http.StatusMethodNotAllowed, "method not allowed")
+		c.JSON(appErr.Status, response.Error(appErr.Status, appErr.Message, appErr.Timestamp))
 	})
 }

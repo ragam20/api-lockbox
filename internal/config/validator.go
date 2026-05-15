@@ -12,6 +12,8 @@ func (e *Env) Validate() error {
 
 	validateAppConfig(e.App, &errs)
 	validateDatabaseConfig(e.Database, &errs)
+	validateRedisConfig(e.RedisConfig, &errs)
+	validateSMTPConfig(e.SMTPConfig, &errs)
 
 	if len(errs) == 0 {
 		return nil
@@ -46,10 +48,38 @@ func validateAppConfig(cfg AppConfig, errs *[]string) {
 	if cfg.RequestTimeout <= 0 {
 		*errs = append(*errs, "app.request_timeout must be > 0")
 	}
+
+	if strings.TrimSpace(cfg.FrontendURL) == "" {
+		*errs = append(*errs, "app.frontend_url is required")
+	}
 }
 
 func validateDatabaseConfig(cfg DatabaseConfig, errs *[]string) {
 	if strings.TrimSpace(cfg.URL) == "" {
 		*errs = append(*errs, "db.url is required")
+	}
+}
+
+func validateRedisConfig(cfg RedisConfig, errs *[]string) {
+	if strings.TrimSpace(cfg.URL) == "" {
+		*errs = append(*errs, "redis.url is required")
+	}
+}
+
+func validateSMTPConfig(cfg SMTPConfig, errs *[]string) {
+	if cfg.Port <= 0 || cfg.Port > 65535 {
+		*errs = append(*errs, "smtp.port must be between 1 and 65535")
+	}
+
+	if strings.TrimSpace(cfg.Host) == "" {
+		*errs = append(*errs, "smtp.host is required")
+	}
+
+	if strings.TrimSpace(cfg.User) == "" {
+		*errs = append(*errs, "smtp.user is required")
+	}
+
+	if strings.TrimSpace(cfg.Pass) == "" {
+		*errs = append(*errs, "smtp.pass is required")
 	}
 }

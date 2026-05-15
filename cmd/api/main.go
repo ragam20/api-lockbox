@@ -3,14 +3,19 @@ package main
 import (
 	"net/http"
 
+	"lockbox/internal/app/auth"
+	"lockbox/internal/cache"
 	"lockbox/internal/config"
 	"lockbox/internal/database"
+	"lockbox/internal/database/repository"
 	appHttp "lockbox/internal/http"
+	"lockbox/internal/http/handler"
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/router"
 	"lockbox/internal/http/server"
 	"lockbox/internal/idgen"
 	"lockbox/internal/logger"
+	"lockbox/internal/smtp"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
@@ -23,12 +28,8 @@ func main() {
 			config.NewConfig,
 			config.NewAppConfig,
 			config.NewDatabaseConfig,
-		),
-	)
-
-	databaseModule := fx.Module("database",
-		fx.Provide(
-			database.NewPostgresConnection,
+			config.NewRedisConfig,
+			config.NewSMTPConfig,
 		),
 	)
 
@@ -36,6 +37,24 @@ func main() {
 		fx.Provide(
 			idgen.NewSnowflakeGen,
 			logger.NewLogger,
+		),
+	)
+
+	databaseModule := fx.Module("database",
+		fx.Provide(
+			database.NewPostgresConnection,
+			cache.NewRedisClient,
+			cache.NewStore,
+			smtp.NewSMTPConfig,
+			smtp.NewMailService,
+		),
+	)
+
+	authModule := fx.Module("auth",
+		fx.Provide(
+			repository.NewAuthRepository,
+			auth.NewAuthService,
+			handler.NewHandler,
 		),
 	)
 
@@ -57,6 +76,7 @@ func main() {
 		databaseModule,
 		infraModule,
 		appHTTPModule,
+		authModule,
 
 		fx.Invoke(
 			func(_ *http.Server, _ *appHttp.CookieManager, _ *gorm.DB) {},
