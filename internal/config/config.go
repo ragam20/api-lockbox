@@ -3,14 +3,14 @@ package config
 import "time"
 
 type AppConfig struct {
-	Env            string        `mapstructure:"env"`
-	Version        string        `mapstructure:"version"`
-	Port           int           `mapstructure:"port"`
-	LogLevel       string        `mapstructure:"log_level"`
-	NodeID         int64         `mapstructure:"node_id"`
-	RequestTimeout time.Duration `mapstructure:"request_timeout"`
-	AllowedOrigins []string      `mapstructure:"allowed_origins"`
-	FrontendURL    string        `mapstructure:"frontend_url"`
+	Env                  string        `mapstructure:"env"`
+	Version              string        `mapstructure:"version"`
+	Port                 int           `mapstructure:"port"`
+	LogLevel             string        `mapstructure:"log_level"`
+	NodeID               int64         `mapstructure:"node_id"`
+	GlobalRequestTimeout time.Duration `mapstructure:"global_request_timeout"`
+	AllowedOrigins       []string      `mapstructure:"allowed_origins"`
+	FrontendURL          string        `mapstructure:"frontend_url"`
 }
 
 type DatabaseConfig struct {

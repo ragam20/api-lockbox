@@ -1,6 +1,10 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"lockbox/internal/app/vault"
+)
 
 type ArgonConfigEntity struct {
 	ID     int64 `gorm:"primaryKey"`
@@ -18,4 +22,15 @@ type ArgonConfigEntity struct {
 
 func (ArgonConfigEntity) TableName() string {
 	return "argon_config"
+}
+
+func (e ArgonConfigEntity) ToDomain() vault.ArgonConfig {
+	return vault.ArgonConfig{
+		ID:          e.ID,
+		Iteration:   e.Time,
+		Parallelism: e.Parallelism,
+		Memory:      e.Memory,
+		CreatedAt:   e.CreatedAt,
+		UpdatedAt:   e.UpdatedAt,
+	}
 }

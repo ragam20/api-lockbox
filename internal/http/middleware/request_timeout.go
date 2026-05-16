@@ -3,24 +3,22 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"time"
 
-	"lockbox/internal/config"
 	"lockbox/internal/http/response"
 
 	"github.com/gin-gonic/gin"
 )
 
-type RequestTimeoutMiddleware struct {
-	cfg *config.AppConfig
+type RequestTimeoutMiddleware struct{}
+
+func NewRequestTimeoutMiddleware() *RequestTimeoutMiddleware {
+	return &RequestTimeoutMiddleware{}
 }
 
-func NewRequestTimeoutMiddleware(cfg *config.AppConfig) *RequestTimeoutMiddleware {
-	return &RequestTimeoutMiddleware{cfg: cfg}
-}
-
-func (m *RequestTimeoutMiddleware) Handle() gin.HandlerFunc {
+func (m *RequestTimeoutMiddleware) Handle(timeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(c.Request.Context(), m.cfg.RequestTimeout)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 		defer cancel()
 
 		c.Request = c.Request.WithContext(ctx)

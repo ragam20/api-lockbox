@@ -11,6 +11,7 @@ func (e *Env) Validate() error {
 	var errs []string
 
 	validateAppConfig(e.App, &errs)
+	validateJWTConfig(e.JWTConfig, &errs)
 	validateDatabaseConfig(e.Database, &errs)
 	validateRedisConfig(e.RedisConfig, &errs)
 	validateSMTPConfig(e.SMTPConfig, &errs)
@@ -45,12 +46,22 @@ func validateAppConfig(cfg AppConfig, errs *[]string) {
 		*errs = append(*errs, "app.node_id must be >= 0")
 	}
 
-	if cfg.RequestTimeout <= 0 {
-		*errs = append(*errs, "app.request_timeout must be > 0")
+	if cfg.GlobalRequestTimeout <= 0 {
+		*errs = append(*errs, "app.global_request_timeout must be > 0")
 	}
 
 	if strings.TrimSpace(cfg.FrontendURL) == "" {
 		*errs = append(*errs, "app.frontend_url is required")
+	}
+}
+
+func validateJWTConfig(cfg JWTConfig, errs *[]string) {
+	if strings.TrimSpace(cfg.Secret) == "" {
+		*errs = append(*errs, "jwt.secret is required")
+	}
+
+	if cfg.Expired <= 0 {
+		*errs = append(*errs, "jwt.expired must be > 0")
 	}
 }
 

@@ -11,10 +11,10 @@ import (
 )
 
 type VerifyJWTMiddleware struct {
-	jwtManager auth.JWTManager
+	jwtManager auth.TokenManager
 }
 
-func NewVerifyJWTMiddleware(jm auth.JWTManager) *VerifyJWTMiddleware {
+func NewVerifyJWTMiddleware(jm auth.TokenManager) *VerifyJWTMiddleware {
 	return &VerifyJWTMiddleware{jwtManager: jm}
 }
 

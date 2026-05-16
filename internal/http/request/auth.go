@@ -1,5 +1,10 @@
 package request
 
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Verifier string `json:"verifier" binding:"required"`
+}
+
 type SendVerifyLinkRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }

@@ -2,8 +2,10 @@ package router
 
 import (
 	"net/http"
+	"time"
 
 	"lockbox/internal/http/handler"
+	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/response"
 
 	"github.com/gin-gonic/gin"
@@ -22,10 +24,12 @@ func NewRoutes(g *gin.Engine, authHandler *handler.AuthHandler) {
 	})
 
 	authAPI := api.Group("/auth")
+	authAPI.Use(middleware.NewRequestTimeoutMiddleware().Handle(5 * time.Second))
 	{
+		authAPI.POST("/login", authHandler.Login)
+		authAPI.POST("/register", authHandler.Register)
 		authAPI.POST("/register/send-verification-link", authHandler.SendVerifyLink)
 		authAPI.GET("/register/verify-email", authHandler.VerifyEmail)
-		authAPI.POST("/register", authHandler.Register)
 	}
 
 	g.NoRoute(func(c *gin.Context) {

@@ -35,6 +35,15 @@ func (r *authRepository) EmailExists(ctx context.Context, email string) (bool, e
 	return count > 0, nil
 }
 
+func (r *authRepository) GetByEmail(ctx context.Context, email string) (auth.User, error) {
+	var e entity.UserEntity
+	if err := r.DB(ctx).Where("email = ?", email).First(&e).Error; err != nil {
+		return auth.User{}, err
+	}
+
+	return e.ToDomainUser(), nil
+}
+
 func (r *authRepository) CreateUser(ctx context.Context, user auth.User) error {
 	userEntity := entity.UserEntity{
 		ID:               user.ID,
