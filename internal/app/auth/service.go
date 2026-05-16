@@ -3,17 +3,22 @@ package auth
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"lockbox/internal"
+	"lockbox/internal/app/vault"
 	"lockbox/internal/cache"
 	"lockbox/internal/config"
 	"lockbox/internal/http/response"
 	"lockbox/internal/idgen"
 	"lockbox/internal/smtp"
+
+	"gorm.io/gorm"
 )
 
 const (
@@ -32,33 +37,130 @@ const (
 
 type (
 	AuthService interface {
+		Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error)
 		SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error
 		VerifyEmail(ctx context.Context, token string) (string, error)
 		Register(ctx context.Context, input RegisterInput) (*User, error)
 	}
 	authService struct {
-		authRepo AuthRepository
-		cache    cache.Store
-		mail     smtp.MailService
-		appCfg   *config.AppConfig
-		idGen    idgen.IDGenerator
+		authRepo        AuthRepository
+		argonConfigRepo vault.ArgonConfigRepository
+		vaultRepo       vault.VaultRepository
+		userSessionRepo UserSessionRepository
+		cache           cache.Store
+		mail            smtp.MailService
+		appCfg          *config.AppConfig
+		idGen           idgen.IDGenerator
+		tokenManager    TokenManager
 	}
 )
 
 func NewAuthService(
 	authRepo AuthRepository,
+	argonConfigRepo vault.ArgonConfigRepository,
+	vaultRepo vault.VaultRepository,
+	userSessionRepo UserSessionRepository,
 	cache cache.Store,
 	mail smtp.MailService,
 	appCfg *config.AppConfig,
 	idGen idgen.IDGenerator,
+	tokenManager TokenManager,
 ) AuthService {
 	return &authService{
-		authRepo: authRepo,
-		cache:    cache,
-		mail:     mail,
-		appCfg:   appCfg,
-		idGen:    idGen,
+		authRepo:        authRepo,
+		argonConfigRepo: argonConfigRepo,
+		vaultRepo:       vaultRepo,
+		userSessionRepo: userSessionRepo,
+		cache:           cache,
+		mail:            mail,
+		appCfg:          appCfg,
+		idGen:           idGen,
+		tokenManager:    tokenManager,
 	}
+}
+
+func (s *authService) Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error) {
+	email := normalizeEmail(loginInput.Email)
+	if email == "" {
+		return response.LoginResponse{}, response.BadRequestError("email is required")
+	}
+
+	user, err := s.authRepo.GetByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.LoginResponse{}, response.BadRequestError("user not found")
+		}
+		return response.LoginResponse{}, response.InternalServerError(err.Error())
+	}
+
+	if !internal.VerifyPassword([]byte(loginInput.Verifier), []byte(user.AuthVerifier)) {
+		return response.LoginResponse{}, response.BadRequestError("invalid password")
+	}
+
+	vault, err := s.vaultRepo.GetVaultByUserID(ctx, user.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.LoginResponse{}, response.BadRequestError("vault not found")
+		}
+		return response.LoginResponse{}, response.InternalServerError(err.Error())
+	}
+
+	argonConfig, err := s.argonConfigRepo.GetConfigByUserID(ctx, user.ID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.LoginResponse{}, response.BadRequestError("argon config not found")
+		}
+		return response.LoginResponse{}, response.InternalServerError(err.Error())
+	}
+
+	accessToken, err := s.tokenManager.GenerateAccessToken(user.ID)
+	if err != nil {
+		return response.LoginResponse{}, response.InternalServerError(err.Error())
+	}
+
+	userSession, err := s.tokenManager.GenerateUserSession(loginInput.IPAddress, loginInput.UserAgent, loginInput.Device)
+	if err != nil {
+		return response.LoginResponse{}, response.InternalServerError(err.Error())
+	}
+
+	if err := s.userSessionRepo.CreateSession(ctx, user.ID, userSession); err != nil {
+		return response.LoginResponse{}, response.BadRequestError("invalid create session")
+	}
+
+	return response.LoginResponse{
+		UserID: user.ID,
+		Email:  user.Email,
+		Name:   user.Name,
+		ImgURL: user.ImgUrl,
+
+		MasterKeySalt: user.MasterKeySalt,
+
+		ArgonConfig: response.ArgonConfigResponse{
+			ID:          argonConfig.ID,
+			Iteration:   argonConfig.Iteration,
+			Memory:      argonConfig.Memory,
+			Parallelism: argonConfig.Parallelism,
+			CreatedAt:   argonConfig.CreatedAt,
+			UpdatedAt:   argonConfig.UpdatedAt,
+		},
+
+		Vault: response.VaultResponse{
+			ID:           vault.ID,
+			Timeout:      vault.Timeout,
+			TimeoutType:  string(vault.TimeoutType),
+			VaultKeySalt: vault.VaultKeySalt,
+			CreatedAt:    vault.CreatedAt,
+			UpdatedAt:    vault.UpdatedAt,
+		},
+
+		Token: response.TokenResponse{
+			AccessToken:  accessToken,
+			RefreshToken: userSession.RefreshToken,
+		},
+
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+	}, nil
 }
 
 func (s *authService) SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error {
@@ -67,10 +169,7 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 		return response.BadRequestError("email is required")
 	}
 
-	opCtx, cancel := context.WithTimeout(ctx, externalResourceTimeout)
-	defer cancel()
-
-	exists, err := s.authRepo.EmailExists(opCtx, email)
+	exists, err := s.authRepo.EmailExists(ctx, email)
 	if err != nil {
 		return response.InternalServerError("failed to check email")
 	}
@@ -78,17 +177,17 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 		return response.NewAppErr(http.StatusConflict, "email already registered")
 	}
 
-	token, err := GenerateSecureToken(tokenByteSize)
+	token, err := s.tokenManager.GenerateSecureToken(tokenByteSize)
 	if err != nil {
 		return response.InternalServerError("failed to generate verification token")
 	}
 
-	if err := s.cache.Set(opCtx, RegisterVerificationKey(token), email, verificationTokenTTL); err != nil {
+	if err := s.cache.Set(ctx, s.tokenManager.RegisterVerificationKey(token), email, verificationTokenTTL); err != nil {
 		return response.InternalServerError("failed to store verification token")
 	}
 
 	link := s.verificationLink(token)
-	if err := s.mail.SendVerifyLink(opCtx, email, link); err != nil {
+	if err := s.mail.SendVerifyLink(ctx, email, link); err != nil {
 		return response.InternalServerError("failed to send verification link")
 	}
 
@@ -101,10 +200,7 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) (string, er
 		return "", response.BadRequestError("token is required")
 	}
 
-	opCtx, cancel := context.WithTimeout(ctx, externalResourceTimeout)
-	defer cancel()
-
-	email, err := s.cache.GetDel(opCtx, RegisterVerificationKey(token))
+	email, err := s.cache.GetDel(ctx, s.tokenManager.RegisterVerificationKey(token))
 	if err != nil {
 		if cache.IsMiss(err) {
 			return "", response.BadRequestError("verification token is invalid or expired")
@@ -112,12 +208,12 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) (string, er
 		return "", response.InternalServerError("failed to validate verification token")
 	}
 
-	session, err := GenerateSecureToken(tokenByteSize)
+	session, err := s.tokenManager.GenerateSecureToken(tokenByteSize)
 	if err != nil {
 		return "", response.InternalServerError("failed to generate register session")
 	}
 
-	if err := s.cache.Set(opCtx, RegisterSessionKey(session), email, registerSessionTTL); err != nil {
+	if err := s.cache.Set(ctx, s.tokenManager.RegisterSessionKey(session), email, registerSessionTTL); err != nil {
 		return "", response.InternalServerError("failed to store register session")
 	}
 
@@ -133,10 +229,7 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 		return nil, err
 	}
 
-	opCtx, cancel := context.WithTimeout(ctx, externalResourceTimeout)
-	defer cancel()
-
-	sessionEmail, err := s.cache.Get(opCtx, RegisterSessionKey(input.Session))
+	sessionEmail, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(input.Session))
 	if err != nil {
 		if cache.IsMiss(err) {
 			return nil, response.BadRequestError("register session is invalid or expired")
@@ -147,7 +240,7 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 		return nil, response.ForbiddenError("register session email mismatch")
 	}
 
-	exists, err := s.authRepo.EmailExists(opCtx, input.Email)
+	exists, err := s.authRepo.EmailExists(ctx, input.Email)
 	if err != nil {
 		return nil, response.InternalServerError("failed to check email")
 	}
@@ -181,21 +274,21 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 		VaultKeySalt: input.Vault.VaultKeySalt,
 	}
 
-	if err := s.authRepo.WithTransaction(opCtx, func(repo AuthRepository) error {
-		if err := repo.CreateUser(opCtx, user); err != nil {
+	if err := s.authRepo.WithTransaction(ctx, func(repo AuthRepository) error {
+		if err := repo.CreateUser(ctx, user); err != nil {
 			return err
 		}
 
-		if err := repo.CreateArgonConfig(opCtx, argonConfig); err != nil {
+		if err := repo.CreateArgonConfig(ctx, argonConfig); err != nil {
 			return err
 		}
 
-		return repo.CreateVault(opCtx, vault)
+		return repo.CreateVault(ctx, vault)
 	}); err != nil {
 		return nil, response.InternalServerError("failed to register user")
 	}
 
-	if err := s.cache.Del(opCtx, RegisterSessionKey(input.Session)); err != nil {
+	if err := s.cache.Del(ctx, s.tokenManager.RegisterSessionKey(input.Session)); err != nil {
 		return nil, response.InternalServerError("failed to delete register session")
 	}
 

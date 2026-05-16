@@ -50,17 +50,26 @@ func main() {
 		),
 	)
 
-	authModule := fx.Module("auth",
+	repositoryModule := fx.Module("repository",
 		fx.Provide(
 			repository.NewAuthRepository,
+			repository.NewArgonConfigRepository,
+			repository.NewUserSessionRepository,
+			repository.NewVaultRepository,
+			repository.NewArgonConfigRepository,
+		),
+	)
+
+	authModule := fx.Module("auth",
+		fx.Provide(
+			auth.NewTokenManager,
 			auth.NewAuthService,
-			handler.NewHandler,
+			handler.NewAuthHandler,
 		),
 	)
 
 	appHTTPModule := fx.Module("apphttp",
 		fx.Provide(
-			middleware.NewRequestTimeoutMiddleware,
 			middleware.NewErrorMiddleware,
 			middleware.NewRecoveryMiddleware,
 
@@ -76,6 +85,7 @@ func main() {
 		databaseModule,
 		infraModule,
 		appHTTPModule,
+		repositoryModule,
 		authModule,
 
 		fx.Invoke(

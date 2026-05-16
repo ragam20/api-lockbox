@@ -1,6 +1,10 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"lockbox/internal/app/auth"
+)
 
 type UserEntity struct {
 	ID int64 `gorm:"primaryKey"`
@@ -21,4 +25,19 @@ type UserEntity struct {
 
 func (UserEntity) TableName() string {
 	return "users"
+}
+
+func (e UserEntity) ToDomainUser() auth.User {
+	return auth.User{
+		ID:               e.ID,
+		Name:             e.Name,
+		Email:            e.Email,
+		EmailVerified:    e.EmailVerified,
+		ImgUrl:           e.ImgURL,
+		MasterKeySalt:    e.MasterKeySalt,
+		AuthVerifier:     e.AuthVerifier,
+		AuthVerifierSalt: e.AuthVerifierSalt,
+		CreatedAt:        e.CreatedAt,
+		UpdatedAt:        e.UpdatedAt,
+	}
 }

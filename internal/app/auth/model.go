@@ -1,13 +1,18 @@
 package auth
 
+import "time"
+
 type User struct {
 	ID               int64
 	Email            string
 	Name             string
+	ImgUrl           *string
 	MasterKeySalt    string
 	AuthVerifier     string
 	AuthVerifierSalt string
 	EmailVerified    bool
+	UpdatedAt        time.Time
+	CreatedAt        time.Time
 }
 
 type ArgonConfig struct {
@@ -37,6 +42,15 @@ type SendVerificationLinkInput struct {
 	Email string
 }
 
+type LoginInput struct {
+	UserID    int64
+	Email     string
+	Verifier  string
+	UserAgent string
+	IPAddress string
+	Device    string
+}
+
 type RegisterInput struct {
 	Session          string
 	Email            string
@@ -49,4 +63,18 @@ type RegisterInput struct {
 
 type VaultInput struct {
 	VaultKeySalt string
+}
+
+type UserSession struct {
+	ID               int64
+	Device           string
+	RefreshToken     string
+	RefreshTokenHash string
+	UserAgent        string
+	IPAddress        string
+	LastUsedAt       time.Time
+	ExpiresAt        time.Time
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

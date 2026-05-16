@@ -30,7 +30,7 @@ func NewGinEngine(
 		gin.Logger(),
 		recovery.Handle(),
 		corsMiddleware,
-		requestTimeout.Handle(),
+		requestTimeout.Handle(appConfig.GlobalRequestTimeout),
 		errorHandling.Handle(),
 	)
 
