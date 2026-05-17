@@ -38,6 +38,7 @@ const (
 type (
 	AuthService interface {
 		Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error)
+		RefreshToken(ctx context.Context, refreshToken string) (response.TokenResponse, error)
 		SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error
 		VerifyEmail(ctx context.Context, token string) (string, error)
 		Register(ctx context.Context, input RegisterInput) (*User, error)
@@ -50,6 +51,7 @@ type (
 		cache           cache.Store
 		mail            smtp.MailService
 		appCfg          *config.AppConfig
+		jwtCfg          *config.JWTConfig
 		idGen           idgen.IDGenerator
 		tokenManager    TokenManager
 	}
@@ -63,6 +65,7 @@ func NewAuthService(
 	cache cache.Store,
 	mail smtp.MailService,
 	appCfg *config.AppConfig,
+	jwtCfg *config.JWTConfig,
 	idGen idgen.IDGenerator,
 	tokenManager TokenManager,
 ) AuthService {
@@ -74,6 +77,7 @@ func NewAuthService(
 		cache:           cache,
 		mail:            mail,
 		appCfg:          appCfg,
+		jwtCfg:          jwtCfg,
 		idGen:           idGen,
 		tokenManager:    tokenManager,
 	}
@@ -88,19 +92,19 @@ func (s *authService) Login(ctx context.Context, loginInput LoginInput) (respons
 	user, err := s.authRepo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.LoginResponse{}, response.BadRequestError("user not found")
+			return response.LoginResponse{}, response.BadRequestError("invalid credentials")
 		}
 		return response.LoginResponse{}, response.InternalServerError(err.Error())
 	}
 
 	if !internal.VerifyPassword([]byte(loginInput.Verifier), []byte(user.AuthVerifier)) {
-		return response.LoginResponse{}, response.BadRequestError("invalid password")
+		return response.LoginResponse{}, response.BadRequestError("invalid credentials")
 	}
 
 	vault, err := s.vaultRepo.GetVaultByUserID(ctx, user.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.LoginResponse{}, response.BadRequestError("vault not found")
+			return response.LoginResponse{}, response.BadRequestError("invalid credentials")
 		}
 		return response.LoginResponse{}, response.InternalServerError(err.Error())
 	}
@@ -108,7 +112,7 @@ func (s *authService) Login(ctx context.Context, loginInput LoginInput) (respons
 	argonConfig, err := s.argonConfigRepo.GetConfigByUserID(ctx, user.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.LoginResponse{}, response.BadRequestError("argon config not found")
+			return response.LoginResponse{}, response.BadRequestError("invalid credentials")
 		}
 		return response.LoginResponse{}, response.InternalServerError(err.Error())
 	}
@@ -160,6 +164,56 @@ func (s *authService) Login(ctx context.Context, loginInput LoginInput) (respons
 
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
+	}, nil
+}
+
+func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (response.TokenResponse, error) {
+	if s.jwtCfg == nil {
+		return response.TokenResponse{}, response.InternalServerError("jwt config is required")
+	}
+
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return response.TokenResponse{}, response.Unauthorized()
+	}
+
+	refreshTokenHash := internal.HashString(refreshToken)
+	session, err := s.userSessionRepo.GetSessionByRefreshTokenHash(ctx, refreshTokenHash)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.TokenResponse{}, response.Unauthorized()
+		}
+		return response.TokenResponse{}, response.InternalServerError("failed to get session")
+	}
+
+	now := time.Now().UTC()
+	if !session.ExpiresAt.IsZero() && now.After(session.ExpiresAt) {
+		return response.TokenResponse{}, response.Unauthorized()
+	}
+
+	accessToken, err := s.tokenManager.GenerateAccessToken(session.UserID)
+	if err != nil {
+		return response.TokenResponse{}, response.InternalServerError(err.Error())
+	}
+
+	newRefreshToken, err := s.tokenManager.GenerateSecureToken(tokenByteSize)
+	if err != nil {
+		return response.TokenResponse{}, response.InternalServerError("failed to generate refresh token")
+	}
+
+	newRefreshTokenHash := internal.HashString(newRefreshToken)
+	expiresAt := now.Add(s.jwtCfg.Expired)
+
+	if err := s.userSessionRepo.UpdateRefreshToken(ctx, session.ID, refreshTokenHash, newRefreshTokenHash, expiresAt, now); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return response.TokenResponse{}, response.Unauthorized()
+		}
+		return response.TokenResponse{}, response.InternalServerError("failed to update refresh token")
+	}
+
+	return response.TokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: newRefreshToken,
 	}, nil
 }
 

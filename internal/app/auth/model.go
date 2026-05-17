@@ -67,6 +67,7 @@ type VaultInput struct {
 
 type UserSession struct {
 	ID               int64
+	UserID           int64
 	Device           string
 	RefreshToken     string
 	RefreshTokenHash string

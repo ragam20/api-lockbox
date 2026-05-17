@@ -1,6 +1,10 @@
 package entity
 
-import "time"
+import (
+	"time"
+
+	"lockbox/internal/app/vault"
+)
 
 type VaultItemType string
 
@@ -30,6 +34,8 @@ type VaultItemEntity struct {
 	IvProtectionKey string `gorm:"type:text;not null"`
 	ProtectionKey   string `gorm:"type:text;not null"`
 
+	ArchivedAt *time.Time
+
 	DeletedAt *time.Time
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -39,4 +45,20 @@ type VaultItemEntity struct {
 
 func (VaultItemEntity) TableName() string {
 	return "vault_items"
+}
+
+func (e VaultItemEntity) ToDomain() vault.VaultItem {
+	return vault.VaultItem{
+		ID:              e.ID,
+		VaultID:         e.VaultID,
+		Title:           e.Title,
+		ItemType:        vault.VaultItemType(e.ItemType),
+		IvCiphertext:    e.IvCiphertext,
+		Ciphertext:      e.Ciphertext,
+		IvProtectionKey: e.IvProtectionKey,
+		ProtectionKey:   e.ProtectionKey,
+		ArchivedAt:      e.ArchivedAt,
+		CreatedAt:       e.CreatedAt,
+		UpdatedAt:       e.UpdatedAt,
+	}
 }

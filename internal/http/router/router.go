@@ -11,7 +11,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewRoutes(g *gin.Engine, authHandler *handler.AuthHandler) {
+func NewRoutes(
+	g *gin.Engine,
+	authHandler *handler.AuthHandler,
+	vaultHandler *handler.VaultHandler,
+	verifyJWT *middleware.VerifyJWTMiddleware,
+	requestTimeout *middleware.RequestTimeoutMiddleware,
+) {
 	api := g.Group("/api")
 	{
 		api.GET("/ping", func(c *gin.Context) {
@@ -27,9 +33,22 @@ func NewRoutes(g *gin.Engine, authHandler *handler.AuthHandler) {
 	authAPI.Use(middleware.NewRequestTimeoutMiddleware().Handle(5 * time.Second))
 	{
 		authAPI.POST("/login", authHandler.Login)
+		authAPI.POST("/refresh-token", authHandler.RefreshToken)
 		authAPI.POST("/register", authHandler.Register)
 		authAPI.POST("/register/send-verification-link", authHandler.SendVerifyLink)
 		authAPI.GET("/register/verify-email", authHandler.VerifyEmail)
+	}
+
+	vaultAPI := api.Group("/vault")
+	vaultAPI.Use(verifyJWT.Handle(), requestTimeout.Handle(5*time.Second))
+	{
+		vaultAPI.POST("/items", vaultHandler.CreateVaultItem)
+		vaultAPI.GET("/items", vaultHandler.GetVaultItem)
+		vaultAPI.GET("/items/:id", vaultHandler.GetVaultItemByID)
+		vaultAPI.PUT("/items/:id", vaultHandler.UpdateVaultItem)
+		vaultAPI.POST("/items/:id/archive", vaultHandler.ArchiveVaultItem)
+		vaultAPI.POST("/items/:id/unarchive", vaultHandler.UnarchiveVaultItem)
+		vaultAPI.DELETE("/items/:id", vaultHandler.DeleteVaultItem)
 	}
 
 	g.NoRoute(func(c *gin.Context) {

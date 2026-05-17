@@ -19,3 +19,17 @@ type ArgonConfigResponse struct {
 	CreatedAt   time.Time `json:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
+
+type VaultItemResponse struct {
+	ID              int64      `json:"id"`
+	VaultID         int64      `json:"vaultId"`
+	Title           string     `json:"title"`
+	ItemType        string     `json:"itemType"`
+	IvCiphertext    string     `json:"ivCiphertext"`
+	Ciphertext      string     `json:"ciphertext"`
+	IvProtectionKey string     `json:"ivProtectionKey"`
+	ProtectionKey   string     `json:"protectionKey"`
+	ArchivedAt      *time.Time `json:"archivedAt"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+}

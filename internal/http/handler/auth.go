@@ -53,11 +53,27 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	expiredAt := time.Now().Add(h.jwtCfg.Expired)
-	http.SetCookie(c.Writer, h.cookieManager.SetAccessToken(result.Token.AccessToken, expiredAt))
-	http.SetCookie(c.Writer, h.cookieManager.SetRefreshToken(result.Token.RefreshToken, expiredAt))
+	h.setAuthCookies(c, result.Token)
 
 	response.Success(c, http.StatusOK, "login success", result)
+}
+
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	refreshToken, err := c.Cookie(apphttp.RefreshTokenCookieName())
+	if err != nil || strings.TrimSpace(refreshToken) == "" {
+		_ = c.Error(response.Unauthorized())
+		return
+	}
+
+	token, err := h.authService.RefreshToken(c.Request.Context(), refreshToken)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	h.setAuthCookies(c, token)
+
+	response.Success(c, http.StatusOK, "refresh token success", token)
 }
 
 func (h *AuthHandler) SendVerifyLink(c *gin.Context) {
@@ -115,6 +131,12 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Email: user.Email,
 		Name:  user.Name,
 	})
+}
+
+func (h *AuthHandler) setAuthCookies(c *gin.Context, token response.TokenResponse) {
+	expiredAt := time.Now().Add(h.jwtCfg.Expired)
+	http.SetCookie(c.Writer, h.cookieManager.SetAccessToken(token.AccessToken, expiredAt))
+	http.SetCookie(c.Writer, h.cookieManager.SetRefreshToken(token.RefreshToken, expiredAt))
 }
 
 func loginDevice(userAgentHeader string) string {

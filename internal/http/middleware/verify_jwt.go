@@ -25,7 +25,7 @@ func (m *VerifyJWTMiddleware) Handle() gin.HandlerFunc {
 		if token == "" {
 			token = getTokenFromHeader(c)
 			if token == "" {
-				c.Error(response.Unauthorized())
+				_ = c.Error(response.Unauthorized())
 				c.Abort()
 				return
 			}
@@ -33,7 +33,7 @@ func (m *VerifyJWTMiddleware) Handle() gin.HandlerFunc {
 
 		jwtUser, err := m.jwtManager.ValidateAccessToken(token)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			c.Abort()
 			return
 		}

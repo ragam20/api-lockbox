@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"lockbox/internal/app/auth"
+	"lockbox/internal/app/vault"
 	"lockbox/internal/cache"
 	"lockbox/internal/config"
 	"lockbox/internal/database"
@@ -30,6 +31,7 @@ func main() {
 			config.NewDatabaseConfig,
 			config.NewRedisConfig,
 			config.NewSMTPConfig,
+			config.NewJWTConfig,
 		),
 	)
 
@@ -56,7 +58,7 @@ func main() {
 			repository.NewArgonConfigRepository,
 			repository.NewUserSessionRepository,
 			repository.NewVaultRepository,
-			repository.NewArgonConfigRepository,
+			repository.NewVaultItemRepository,
 		),
 	)
 
@@ -68,14 +70,21 @@ func main() {
 		),
 	)
 
+	vaultModule := fx.Module("vault",
+		fx.Provide(
+			vault.NewVaultService,
+			handler.NewVaultHandler,
+		),
+	)
+
 	appHTTPModule := fx.Module("apphttp",
 		fx.Provide(
 			middleware.NewErrorMiddleware,
 			middleware.NewRecoveryMiddleware,
-
+			middleware.NewVerifyJWTMiddleware,
+			middleware.NewRequestTimeoutMiddleware,
 			server.NewGinEngine,
 			server.NewHTTPServer,
-
 			appHttp.NewCookieManager,
 		),
 	)
@@ -87,6 +96,7 @@ func main() {
 		appHTTPModule,
 		repositoryModule,
 		authModule,
+		vaultModule,
 
 		fx.Invoke(
 			func(_ *http.Server, _ *appHttp.CookieManager, _ *gorm.DB) {},
