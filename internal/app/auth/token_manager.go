@@ -58,6 +58,7 @@ func (m *tokenManager) GenerateUserSession(ipAddress, userAgent, device string) 
 		IPAddress:        ipAddress,
 		UserAgent:        userAgent,
 		Device:           device,
+		LastUsedAt:       time.Now(),
 		ExpiresAt:        time.Now().Add(m.cfg.Expired),
 	}, nil
 }

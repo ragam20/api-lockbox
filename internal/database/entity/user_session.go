@@ -11,7 +11,7 @@ type UserSessionEntity struct {
 	UserAgent        string
 	IPAddress        string
 
-	LastUsedAt *time.Time
+	LastUsedAt time.Time
 	ExpiresAt  time.Time `gorm:"not null;index"`
 
 	User UserEntity `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:UserID;references:ID"`

@@ -1,6 +1,9 @@
 package auth
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type AuthRepository interface {
 	WithTransaction(ctx context.Context, fn func(repo AuthRepository) error) error
@@ -13,4 +16,6 @@ type AuthRepository interface {
 
 type UserSessionRepository interface {
 	CreateSession(ctx context.Context, userID int64, userSession UserSession) error
+	GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error)
+	UpdateRefreshToken(ctx context.Context, sessionID int64, oldRefreshTokenHash string, newRefreshTokenHash string, expiresAt time.Time, lastUsedAt time.Time) error
 }

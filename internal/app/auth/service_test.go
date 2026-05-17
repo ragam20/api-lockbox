@@ -8,6 +8,9 @@ import (
 
 	"lockbox/internal"
 	appVault "lockbox/internal/app/vault"
+	"lockbox/internal/config"
+
+	"gorm.io/gorm"
 )
 
 func TestLoginRejectsInvalidVerifier(t *testing.T) {
@@ -27,6 +30,72 @@ func TestLoginRejectsInvalidVerifier(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected invalid verifier to be rejected")
+	}
+	if err.Error() != "invalid credentials" {
+		t.Fatalf("expected generic invalid credentials error, got %q", err.Error())
+	}
+}
+
+func TestLoginRejectsUnknownUserWithGenericError(t *testing.T) {
+	service := &authService{
+		authRepo: &loginAuthRepo{
+			err: gorm.ErrRecordNotFound,
+		},
+	}
+
+	_, err := service.Login(context.Background(), LoginInput{
+		Email:    "missing@example.com",
+		Verifier: "any-verifier",
+	})
+	if err == nil {
+		t.Fatal("expected missing user to be rejected")
+	}
+	if err.Error() != "invalid credentials" {
+		t.Fatalf("expected generic invalid credentials error, got %q", err.Error())
+	}
+}
+
+func TestRefreshTokenRotatesSessionAndReturnsNewTokens(t *testing.T) {
+	sessionRepo := &loginUserSessionRepo{
+		session: UserSession{
+			ID:               10,
+			UserID:           1,
+			RefreshTokenHash: internal.HashString("old-refresh-token"),
+			ExpiresAt:        time.Now().Add(time.Hour),
+		},
+	}
+	tokenManager := &loginTokenManager{
+		accessToken: "new-access-token",
+		secureToken: "new-refresh-token",
+	}
+	service := &authService{
+		userSessionRepo: sessionRepo,
+		tokenManager:    tokenManager,
+		jwtCfg:          &config.JWTConfig{Expired: time.Hour},
+	}
+
+	result, err := service.RefreshToken(context.Background(), "old-refresh-token")
+	if err != nil {
+		t.Fatalf("expected refresh token to succeed: %v", err)
+	}
+
+	if result.AccessToken != "new-access-token" {
+		t.Fatalf("expected new access token, got %q", result.AccessToken)
+	}
+	if result.RefreshToken != "new-refresh-token" {
+		t.Fatalf("expected new refresh token, got %q", result.RefreshToken)
+	}
+	if sessionRepo.updateSessionID != 10 {
+		t.Fatalf("expected session 10 to be updated, got %d", sessionRepo.updateSessionID)
+	}
+	if sessionRepo.updateOldHash != internal.HashString("old-refresh-token") {
+		t.Fatalf("expected old hash to be checked, got %q", sessionRepo.updateOldHash)
+	}
+	if sessionRepo.updateNewHash != internal.HashString("new-refresh-token") {
+		t.Fatalf("expected new hash to be stored, got %q", sessionRepo.updateNewHash)
+	}
+	if sessionRepo.session.RefreshTokenHash != internal.HashString("old-refresh-token") {
+		t.Fatalf("expected stored lookup session to stay unchanged, got %q", sessionRepo.session.RefreshTokenHash)
 	}
 }
 
@@ -147,17 +216,42 @@ func (r *loginArgonConfigRepo) GetConfigByUserID(ctx context.Context, userID int
 }
 
 type loginUserSessionRepo struct {
-	session UserSession
-	err     error
+	session         UserSession
+	err             error
+	updateSessionID int64
+	updateOldHash   string
+	updateNewHash   string
 }
 
 func (r *loginUserSessionRepo) CreateSession(ctx context.Context, userID int64, userSession UserSession) error {
 	r.session = userSession
+	r.session.UserID = userID
 	return r.err
+}
+
+func (r *loginUserSessionRepo) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error) {
+	if r.err != nil {
+		return UserSession{}, r.err
+	}
+	if r.session.RefreshTokenHash != refreshTokenHash {
+		return UserSession{}, gorm.ErrRecordNotFound
+	}
+	return r.session, nil
+}
+
+func (r *loginUserSessionRepo) UpdateRefreshToken(ctx context.Context, sessionID int64, oldRefreshTokenHash string, newRefreshTokenHash string, expiresAt time.Time, lastUsedAt time.Time) error {
+	r.updateSessionID = sessionID
+	r.updateOldHash = oldRefreshTokenHash
+	r.updateNewHash = newRefreshTokenHash
+	if r.err != nil {
+		return r.err
+	}
+	return nil
 }
 
 type loginTokenManager struct {
 	accessToken string
+	secureToken string
 	session     UserSession
 	userAgent   string
 }
@@ -182,7 +276,7 @@ func (m *loginTokenManager) ValidateAccessToken(accessToken string) (*JWTUser, e
 }
 
 func (m *loginTokenManager) GenerateSecureToken(byteSize int) (string, error) {
-	return "", nil
+	return m.secureToken, nil
 }
 
 func (m *loginTokenManager) RegisterVerificationKey(token string) string {
