@@ -34,6 +34,34 @@ func NewAuthHandler(
 	}
 }
 
+func (h *AuthHandler) Logout(c *gin.Context) {
+	userID, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	refreshToken, err := c.Cookie(apphttp.RefreshTokenCookieName())
+	if err != nil {
+		var reqBody struct {
+			RefreshToken string `json:"refreshToken"`
+		}
+		if err := c.ShouldBindJSON(&reqBody); err != nil {
+			response.Success(c, http.StatusOK, "success logout", true)
+			return
+		}
+
+		refreshToken = reqBody.RefreshToken
+	}
+
+	c.SetCookieData(h.cookieManager.RevokeAccessToken())
+	c.SetCookieData(h.cookieManager.RevokeRefreshToken())
+
+	h.authService.Logout(c.Request.Context(), userID, refreshToken)
+
+	response.Success(c, http.StatusOK, "success logout", true)
+}
+
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req request.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

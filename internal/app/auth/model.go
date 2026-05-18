@@ -75,6 +75,7 @@ type UserSession struct {
 	IPAddress        string
 	LastUsedAt       time.Time
 	ExpiresAt        time.Time
+	RevokeAt         *time.Time
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

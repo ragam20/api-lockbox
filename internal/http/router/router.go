@@ -32,6 +32,7 @@ func NewRoutes(
 	authAPI := api.Group("/auth")
 	authAPI.Use(middleware.NewRequestTimeoutMiddleware().Handle(5 * time.Second))
 	{
+		authAPI.POST("/logout", verifyJWT.Handle(), authHandler.Logout)
 		authAPI.POST("/login", authHandler.Login)
 		authAPI.POST("/refresh-token", authHandler.RefreshToken)
 		authAPI.POST("/register", authHandler.Register)
