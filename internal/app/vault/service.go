@@ -49,6 +49,8 @@ func (s *vaultService) GetVaultItem(ctx context.Context, input GetVaultInput) (G
 		return GetVaultItemsResult{}, response.BadRequestError("vault type must be password or note")
 	}
 
+	input.Query.Search = strings.TrimSpace(input.Query.Search)
+
 	result, err := s.vaultItemRepo.GetVaultItem(ctx, input)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

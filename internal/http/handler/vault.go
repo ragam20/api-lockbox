@@ -44,13 +44,12 @@ func (h *VaultHandler) GetVaultItem(c *gin.Context) {
 		return
 	}
 
-	sortBy := c.Query("sortBy")
-
 	resp, err := h.vaultService.GetVaultItem(c.Request.Context(), vault.GetVaultInput{
 		Query: vault.VaultItemQuery{
 			Page:   pagination.Page,
 			Limit:  pagination.Limit,
-			SortBy: sortBy,
+			SortBy: c.Query("sortBy"),
+			Search: c.Query("search"),
 		},
 		VaultType: vaultType,
 		UserID:    userID,

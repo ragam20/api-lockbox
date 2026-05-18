@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"lockbox/internal/app/vault"
@@ -30,6 +31,10 @@ func (r *vaultItemRepository) GetVaultItem(ctx context.Context, input vault.GetV
 	db := r.DB(ctx).
 		Joins("JOIN vaults ON vaults.id = vault_items.vault_id").
 		Where("vaults.user_id = ? AND vault_items.item_type = ? AND vault_items.deleted_at IS NULL AND "+archivedClause, input.UserID, input.VaultType)
+
+	if search := strings.TrimSpace(input.Query.Search); search != "" {
+		db = db.Where("vault_items.title ILIKE ?", "%"+search+"%")
+	}
 
 	countDB := db.Session(&gorm.Session{})
 	var totalItems int64
