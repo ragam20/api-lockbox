@@ -18,6 +18,13 @@ func NewUserSessionRepository(db *gorm.DB) auth.UserSessionRepository {
 	return &userSessionRepository{BaseRepository{db: db}}
 }
 
+func (r *userSessionRepository) RevokeSession(ctx context.Context, userID int64, tokenHash string) error {
+	return r.DB(ctx).Where("refresh_token_hash = ? AND user_id = ?", tokenHash, userID).
+		Updates(map[string]any{
+			"revoke_at": time.Now(),
+		}).Error
+}
+
 func (r *userSessionRepository) CreateSession(ctx context.Context, userID int64, userSession auth.UserSession) error {
 	e := entity.UserSessionEntity{
 		ID:               userSession.ID,
@@ -52,6 +59,7 @@ func (r *userSessionRepository) GetSessionByRefreshTokenHash(ctx context.Context
 		IPAddress:        e.IPAddress,
 		LastUsedAt:       e.LastUsedAt,
 		ExpiresAt:        e.ExpiresAt,
+		RevokeAt:         e.RevokeAt,
 		CreatedAt:        e.CreatedAt,
 		UpdatedAt:        e.UpdatedAt,
 	}, nil

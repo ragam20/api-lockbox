@@ -37,6 +37,7 @@ const (
 
 type (
 	AuthService interface {
+		Logout(ctx context.Context, userID int64, token string)
 		Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error)
 		RefreshToken(ctx context.Context, refreshToken string) (response.TokenResponse, error)
 		SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error
@@ -81,6 +82,19 @@ func NewAuthService(
 		idGen:           idGen,
 		tokenManager:    tokenManager,
 	}
+}
+
+func (s *authService) Logout(ctx context.Context, userID int64, token string) {
+	if userID < 0 {
+		return
+	}
+
+	if token == "" {
+		return
+	}
+
+	tokenHash := internal.HashString(token)
+	s.userSessionRepo.RevokeSession(ctx, userID, tokenHash)
 }
 
 func (s *authService) Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error) {
@@ -184,6 +198,10 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 			return response.TokenResponse{}, response.Unauthorized()
 		}
 		return response.TokenResponse{}, response.InternalServerError("failed to get session")
+	}
+
+	if session.RevokeAt != nil {
+		return response.TokenResponse{}, response.BadRequestError("refresh token expired")
 	}
 
 	now := time.Now().UTC()
