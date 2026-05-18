@@ -94,6 +94,7 @@ type VaultItemQuery struct {
 	Page   int
 	Limit  int
 	SortBy string
+	Search string
 }
 
 func (f *VaultItemQuery) ParseOrder() (string, string) {
