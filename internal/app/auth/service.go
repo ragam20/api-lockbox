@@ -40,6 +40,7 @@ type (
 		Logout(ctx context.Context, userID int64, token string)
 		Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error)
 		RefreshToken(ctx context.Context, refreshToken string) (response.TokenResponse, error)
+		GetRegisterSession(ctx context.Context, session string) (response.RegisterSessionResponse, error)
 		SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error
 		VerifyEmail(ctx context.Context, token string) (string, error)
 		Register(ctx context.Context, input RegisterInput) (*User, error)
@@ -146,12 +147,15 @@ func (s *authService) Login(ctx context.Context, loginInput LoginInput) (respons
 	}
 
 	return response.LoginResponse{
-		UserID: user.ID,
-		Email:  user.Email,
-		Name:   user.Name,
-		ImgURL: user.ImgUrl,
-
-		MasterKeySalt: user.MasterKeySalt,
+		User: response.UserResponse{
+			UserID:        user.ID,
+			Email:         user.Email,
+			Name:          user.Name,
+			ImgURL:        user.ImgUrl,
+			MasterKeySalt: user.MasterKeySalt,
+			CreatedAt:     user.CreatedAt,
+			UpdatedAt:     user.UpdatedAt,
+		},
 
 		ArgonConfig: response.ArgonConfigResponse{
 			ID:          argonConfig.ID,
@@ -175,9 +179,6 @@ func (s *authService) Login(ctx context.Context, loginInput LoginInput) (respons
 			AccessToken:  accessToken,
 			RefreshToken: userSession.RefreshToken,
 		},
-
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
 	}, nil
 }
 
@@ -232,6 +233,26 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 	return response.TokenResponse{
 		AccessToken:  accessToken,
 		RefreshToken: newRefreshToken,
+	}, nil
+}
+
+func (s *authService) GetRegisterSession(ctx context.Context, session string) (response.RegisterSessionResponse, error) {
+	if session == "" {
+		return response.RegisterSessionResponse{}, response.BadRequestError("session is required")
+	}
+
+	isSession, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(session))
+	if err != nil || isSession == "" {
+		return response.RegisterSessionResponse{}, response.BadRequestError("session not found")
+	}
+
+	email, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(session))
+	if err != nil || email == "" {
+		return response.RegisterSessionResponse{}, response.BadRequestError("session data not found")
+	}
+
+	return response.RegisterSessionResponse{
+		Email: email,
 	}, nil
 }
 
@@ -343,7 +364,7 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 		UserID:       user.ID,
 		Timeout:      defaultVaultTimeout,
 		TimeoutType:  defaultVaultTimeoutType,
-		VaultKeySalt: input.Vault.VaultKeySalt,
+		VaultKeySalt: input.VaultKeySalt,
 	}
 
 	if err := s.authRepo.WithTransaction(ctx, func(repo AuthRepository) error {
@@ -369,7 +390,7 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 
 func (s *authService) verificationLink(token string) string {
 	baseURL := strings.TrimRight(s.appCfg.FrontendURL, "/")
-	return fmt.Sprintf("%s/verify-email?token=%s", baseURL, url.QueryEscape(token))
+	return fmt.Sprintf("%s/auth/verify-email?token=%s", baseURL, url.QueryEscape(token))
 }
 
 func validateRegisterInput(input RegisterInput) error {
@@ -387,7 +408,7 @@ func validateRegisterInput(input RegisterInput) error {
 		"authVerifier":     input.AuthVerifier,
 		"authVerifierSalt": input.AuthVerifierSalt,
 		"masterKeySalt":    input.MasterKeySalt,
-		"vaultKeySalt":     input.Vault.VaultKeySalt,
+		"vaultKeySalt":     input.VaultKeySalt,
 	}
 	for field, value := range base64Fields {
 		if !isBase64(value) {

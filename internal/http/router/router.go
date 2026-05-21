@@ -36,8 +36,9 @@ func NewRoutes(
 		authAPI.POST("/login", authHandler.Login)
 		authAPI.POST("/refresh-token", authHandler.RefreshToken)
 		authAPI.POST("/register", authHandler.Register)
-		authAPI.POST("/register/send-verification-link", authHandler.SendVerifyLink)
+		authAPI.POST("/register/request-verification-link", authHandler.SendVerifyLink)
 		authAPI.GET("/register/verify-email", authHandler.VerifyEmail)
+		authAPI.POST("/register/session", authHandler.GetRegisterSession)
 	}
 
 	vaultAPI := api.Group("/vault")

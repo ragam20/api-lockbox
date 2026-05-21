@@ -1,6 +1,8 @@
 package response
 
-import "time"
+type RegisterSessionResponse struct {
+	Email string `json:"email"`
+}
 
 type RegisterResponse struct {
 	ID    int64  `json:"id"`
@@ -9,22 +11,17 @@ type RegisterResponse struct {
 }
 
 type LoginResponse struct {
-	UserID int64   `json:"userId"`
-	Email  string  `json:"email"`
-	Name   string  `json:"name"`
-	ImgURL *string `json:"imgURL"`
-
-	MasterKeySalt string `json:"masterKeySalt"`
-
+	User        UserResponse        `json:"user"`
 	Vault       VaultResponse       `json:"vault"`
 	ArgonConfig ArgonConfigResponse `json:"argonConfig"`
 	Token       TokenResponse       `json:"token"`
-
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 type TokenResponse struct {
 	AccessToken  string `json:"accessToken"`
 	RefreshToken string `json:"refreshToken"`
+}
+
+type VerifyEmailResponse struct {
+	Session string `json:"session"`
 }

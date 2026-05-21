@@ -58,7 +58,7 @@ type RegisterInput struct {
 	AuthVerifier     string
 	AuthVerifierSalt string
 	MasterKeySalt    string
-	Vault            VaultInput
+	VaultKeySalt     string
 }
 
 type VaultInput struct {
