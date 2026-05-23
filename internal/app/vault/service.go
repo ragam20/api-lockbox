@@ -14,8 +14,19 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	defaultArgonMemory      = 64 * 1024
+	defaultArgonIterations  = 3
+	defaultArgonParallelism = 2
+	defaultVaultTimeout     = 10
+	defaultVaultTimeoutType = VaultTimeoutTypeLock
+)
+
 type (
 	VaultService interface {
+		GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error)
+		CreateVault(ctx context.Context, userID int64, vaultKeySalt string) error
+		CreateArgonConfig(ctx context.Context, userID int64) error
 		GetVaultItem(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error)
 		GetVaultItemByID(ctx context.Context, input GetVaultItemByIDInput) (VaultItem, error)
 		CreateVaultItem(ctx context.Context, input CreateVaultItemInput) (VaultItem, error)
@@ -26,18 +37,58 @@ type (
 	}
 
 	vaultService struct {
-		vaultRepo     VaultRepository
-		vaultItemRepo VaultItemRepository
-		idGen         idgen.IDGenerator
+		vaultRepo VaultRepository
+		idGen     idgen.IDGenerator
 	}
 )
 
-func NewVaultService(vaultRepo VaultRepository, vaultItemRepo VaultItemRepository, idGen idgen.IDGenerator) VaultService {
+func NewVaultService(vaultRepo VaultRepository, idGen idgen.IDGenerator) VaultService {
 	return &vaultService{
-		vaultRepo:     vaultRepo,
-		vaultItemRepo: vaultItemRepo,
-		idGen:         idGen,
+		vaultRepo: vaultRepo,
+		idGen:     idGen,
 	}
+}
+
+func (s *vaultService) GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error) {
+	conf, err := s.vaultRepo.GetArgonConfig(ctx, userID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return ArgonConfig{}, response.BadRequestError(ErrNotFound.Error(), "argon config not found")
+		}
+		return ArgonConfig{}, response.InternalServerError(err.Error())
+	}
+
+	return conf, nil
+}
+
+func (s *vaultService) CreateVault(ctx context.Context, userID int64, vaultKeySalt string) error {
+	vault := Vault{
+		ID:           s.idGen.NewID(),
+		Timeout:      defaultVaultTimeout,
+		TimeoutType:  defaultVaultTimeoutType,
+		VaultKeySalt: vaultKeySalt,
+	}
+
+	if err := s.vaultRepo.CreateVault(ctx, vault, userID); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *vaultService) CreateArgonConfig(ctx context.Context, userID int64) error {
+	argonConfig := ArgonConfig{
+		ID:          s.idGen.NewID(),
+		Memory:      defaultArgonMemory,
+		Iterations:  defaultArgonIterations,
+		Parallelism: defaultArgonParallelism,
+	}
+
+	if err := s.vaultRepo.CreateArgonConfig(ctx, argonConfig, userID); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *vaultService) GetVaultItem(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error) {
@@ -46,15 +97,15 @@ func (s *vaultService) GetVaultItem(ctx context.Context, input GetVaultInput) (G
 	}
 
 	if !CheckVaultType(input.VaultType) {
-		return GetVaultItemsResult{}, response.BadRequestError("vault type must be password or note")
+		return GetVaultItemsResult{}, response.BadRequestError(ErrVaultType.Error(), "vault type must be password or note")
 	}
 
 	input.Query.Search = strings.TrimSpace(input.Query.Search)
 
-	result, err := s.vaultItemRepo.GetVaultItem(ctx, input)
+	result, err := s.vaultRepo.GetVaultItem(ctx, input)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return GetVaultItemsResult{}, nil
+			return GetVaultItemsResult{}, response.NotFoundError(ErrNotFound.Error(), "vault not found")
 		}
 		return GetVaultItemsResult{}, response.InternalServerError("failed to get vault items")
 	}
@@ -67,13 +118,13 @@ func (s *vaultService) GetVaultItemByID(ctx context.Context, input GetVaultItemB
 		return VaultItem{}, response.Unauthorized()
 	}
 	if input.ItemID == 0 {
-		return VaultItem{}, response.BadRequestError("vault item id is required")
+		return VaultItem{}, response.BadRequestError(ErrRequiredID.Error(), "vault item id is required")
 	}
 
-	item, err := s.vaultItemRepo.GetVaultItemByID(ctx, input)
+	item, err := s.vaultRepo.GetVaultItemByID(ctx, input)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VaultItem{}, response.NotFoundError("vault item not found")
+			return VaultItem{}, response.NotFoundError(ErrNotFound.Error(), "vault item not found")
 		}
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -90,7 +141,7 @@ func (s *vaultService) CreateVaultItem(ctx context.Context, input CreateVaultIte
 	vault, err := s.vaultRepo.GetVaultByUserID(ctx, input.UserID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VaultItem{}, response.NotFoundError("vault not found")
+			return VaultItem{}, response.NotFoundError(ErrNotFound.Error(), "vault not found")
 		}
 		return VaultItem{}, response.InternalServerError("failed to get vault")
 	}
@@ -106,11 +157,11 @@ func (s *vaultService) CreateVaultItem(ctx context.Context, input CreateVaultIte
 		ProtectionKey:   input.ProtectionKey,
 	}
 
-	if err := s.vaultItemRepo.CreateVaultItem(ctx, item); err != nil {
+	if err := s.vaultRepo.CreateVaultItem(ctx, item); err != nil {
 		return VaultItem{}, response.InternalServerError("failed to create vault item")
 	}
 
-	created, err := s.vaultItemRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: input.UserID, ItemID: item.ID})
+	created, err := s.vaultRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: input.UserID, ItemID: item.ID})
 	if err != nil {
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -124,10 +175,10 @@ func (s *vaultService) UpdateVaultItem(ctx context.Context, input UpdateVaultIte
 		return VaultItem{}, err
 	}
 
-	existing, err := s.vaultItemRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: input.UserID, ItemID: input.ItemID})
+	existing, err := s.vaultRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: input.UserID, ItemID: input.ItemID})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VaultItem{}, response.NotFoundError("vault item not found")
+			return VaultItem{}, response.NotFoundError(ErrNotFound.Error(), "vault item not found")
 		}
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -143,11 +194,11 @@ func (s *vaultService) UpdateVaultItem(ctx context.Context, input UpdateVaultIte
 		ProtectionKey:   input.ProtectionKey,
 	}
 
-	if err := s.vaultItemRepo.UpdateVaultItem(ctx, item); err != nil {
+	if err := s.vaultRepo.UpdateVaultItem(ctx, item); err != nil {
 		return VaultItem{}, response.InternalServerError("failed to update vault item")
 	}
 
-	updated, err := s.vaultItemRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: input.UserID, ItemID: input.ItemID})
+	updated, err := s.vaultRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: input.UserID, ItemID: input.ItemID})
 	if err != nil {
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -160,13 +211,13 @@ func (s *vaultService) ArchiveVaultItem(ctx context.Context, userID int64, itemI
 		return VaultItem{}, response.Unauthorized()
 	}
 	if itemID == 0 {
-		return VaultItem{}, response.BadRequestError("vault item id is required")
+		return VaultItem{}, response.BadRequestError(ErrRequiredID.Error(), "vault item id is required")
 	}
 
-	existing, err := s.vaultItemRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID})
+	existing, err := s.vaultRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VaultItem{}, response.NotFoundError("vault item not found")
+			return VaultItem{}, response.NotFoundError(ErrNotFound.Error(), "vault item not found")
 		}
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -175,14 +226,14 @@ func (s *vaultService) ArchiveVaultItem(ctx context.Context, userID int64, itemI
 	item := existing
 	item.ArchivedAt = &now
 
-	if err := s.vaultItemRepo.ArchiveVaultItem(ctx, item); err != nil {
+	if err := s.vaultRepo.ArchiveVaultItem(ctx, item); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VaultItem{}, response.NotFoundError("vault item not found")
+			return VaultItem{}, response.NotFoundError(ErrNotFound.Error(), "vault item not found")
 		}
 		return VaultItem{}, response.InternalServerError("failed to archive vault item")
 	}
 
-	archived, err := s.vaultItemRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID, Archived: true})
+	archived, err := s.vaultRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID, Archived: true})
 	if err != nil {
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -195,13 +246,13 @@ func (s *vaultService) UnarchiveVaultItem(ctx context.Context, userID int64, ite
 		return VaultItem{}, response.Unauthorized()
 	}
 	if itemID == 0 {
-		return VaultItem{}, response.BadRequestError("vault item id is required")
+		return VaultItem{}, response.BadRequestError(ErrRequiredID.Error(), "vault item id is required")
 	}
 
-	existing, err := s.vaultItemRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID, Archived: true})
+	existing, err := s.vaultRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID, Archived: true})
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VaultItem{}, response.NotFoundError("vault item not found")
+			return VaultItem{}, response.NotFoundError(ErrNotFound.Error(), "vault item not found")
 		}
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -209,14 +260,14 @@ func (s *vaultService) UnarchiveVaultItem(ctx context.Context, userID int64, ite
 	item := existing
 	item.ArchivedAt = nil
 
-	if err := s.vaultItemRepo.UnarchiveVaultItem(ctx, item); err != nil {
+	if err := s.vaultRepo.UnarchiveVaultItem(ctx, item); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return VaultItem{}, response.NotFoundError("vault item not found")
+			return VaultItem{}, response.NotFoundError(ErrNotFound.Error(), "vault item not found")
 		}
 		return VaultItem{}, response.InternalServerError("failed to unarchive vault item")
 	}
 
-	unarchived, err := s.vaultItemRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID})
+	unarchived, err := s.vaultRepo.GetVaultItemByID(ctx, GetVaultItemByIDInput{UserID: userID, ItemID: itemID})
 	if err != nil {
 		return VaultItem{}, response.InternalServerError("failed to get vault item")
 	}
@@ -229,12 +280,12 @@ func (s *vaultService) DeleteVaultItem(ctx context.Context, userID int64, itemID
 		return response.Unauthorized()
 	}
 	if itemID == 0 {
-		return response.BadRequestError("vault item id is required")
+		return response.BadRequestError(ErrRequiredID.Error(), "vault item id is required")
 	}
 
-	if err := s.vaultItemRepo.DeleteVaultItem(ctx, userID, itemID); err != nil {
+	if err := s.vaultRepo.DeleteVaultItem(ctx, userID, itemID); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.NotFoundError("vault item not found")
+			return response.NotFoundError(ErrNotFound.Error(), "vault item not found")
 		}
 		return response.InternalServerError("failed to delete vault item")
 	}
@@ -282,7 +333,7 @@ func validateUpdateVaultItemInput(input UpdateVaultItemInput) error {
 		return response.Unauthorized()
 	}
 	if input.ItemID == 0 {
-		return response.BadRequestError("vault item id is required")
+		return response.BadRequestError(ErrRequiredID.Error(), "vault item id is required")
 	}
 
 	return validateVaultItemFields(
@@ -304,10 +355,10 @@ func validateVaultItemFields(
 	protectionKey string,
 ) error {
 	if title == "" {
-		return response.BadRequestError("title is required")
+		return response.BadRequestError(ErrFieldTitle.Error(), "title is required")
 	}
 	if !itemType.IsValid() {
-		return response.BadRequestError("itemType must be password or note")
+		return response.BadRequestError(ErrVaultType.Error(), "itemType must be password or note")
 	}
 
 	base64Fields := map[string]string{
@@ -318,7 +369,7 @@ func validateVaultItemFields(
 	}
 	for field, value := range base64Fields {
 		if !isBase64(value) {
-			return response.BadRequestError(fmt.Sprintf("%s must be a valid base64 string", field))
+			return response.BadRequestError(ErrInvalidInput.Error(), fmt.Sprintf("%s must be a valid base64 string", field))
 		}
 	}
 

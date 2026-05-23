@@ -2,7 +2,6 @@ package handler
 
 import (
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -20,17 +19,20 @@ type AuthHandler struct {
 	authService   auth.AuthService
 	cookieManager *apphttp.CookieManager
 	jwtCfg        *config.JWTConfig
+	appConfig     *config.AppConfig
 }
 
 func NewAuthHandler(
 	authService auth.AuthService,
 	cookieManager *apphttp.CookieManager,
 	jwtCfg *config.JWTConfig,
+	appConfig *config.AppConfig,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:   authService,
 		cookieManager: cookieManager,
 		jwtCfg:        jwtCfg,
+		appConfig:     appConfig,
 	}
 }
 
@@ -65,7 +67,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req request.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 
@@ -104,10 +106,26 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	response.Success(c, http.StatusOK, "refresh token success", token)
 }
 
+func (h *AuthHandler) GetRegisterSession(c *gin.Context) {
+	var req request.RegisterSessionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	resp, err := h.authService.GetRegisterSession(c.Request.Context(), req.Session)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success get register session", resp)
+}
+
 func (h *AuthHandler) SendVerifyLink(c *gin.Context) {
 	var req request.SendVerifyLinkRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 
@@ -128,13 +146,15 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, "/register/complete?session="+url.QueryEscape(session))
+	response.Success(c, http.StatusOK, "success verification email", response.VerifyEmailResponse{
+		Session: session,
+	})
 }
 
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req request.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 
@@ -145,9 +165,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		AuthVerifier:     req.AuthVerifier,
 		AuthVerifierSalt: req.AuthVerifierSalt,
 		MasterKeySalt:    req.MasterKeySalt,
-		Vault: auth.VaultInput{
-			VaultKeySalt: req.Vault.VaultKeySalt,
-		},
+		VaultKeySalt:     req.VaultKeySalt,
 	})
 	if err != nil {
 		_ = c.Error(err)

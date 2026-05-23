@@ -27,12 +27,6 @@ const (
 	externalResourceTimeout = 5 * time.Second
 
 	tokenByteSize = 32
-
-	defaultArgonMemory      = 64 * 1024
-	defaultArgonIterations  = 3
-	defaultArgonParallelism = 2
-	defaultVaultTimeout     = 10
-	defaultVaultTimeoutType = VaultTimeoutTypeLock
 )
 
 type (
@@ -40,29 +34,26 @@ type (
 		Logout(ctx context.Context, userID int64, token string)
 		Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error)
 		RefreshToken(ctx context.Context, refreshToken string) (response.TokenResponse, error)
+		GetRegisterSession(ctx context.Context, session string) (response.RegisterSessionResponse, error)
 		SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error
 		VerifyEmail(ctx context.Context, token string) (string, error)
 		Register(ctx context.Context, input RegisterInput) (*User, error)
 	}
 	authService struct {
-		authRepo        AuthRepository
-		argonConfigRepo vault.ArgonConfigRepository
-		vaultRepo       vault.VaultRepository
-		userSessionRepo UserSessionRepository
-		cache           cache.Store
-		mail            smtp.MailService
-		appCfg          *config.AppConfig
-		jwtCfg          *config.JWTConfig
-		idGen           idgen.IDGenerator
-		tokenManager    TokenManager
+		authRepo     AuthRepository
+		vaultService vault.VaultService
+		cache        cache.Store
+		mail         smtp.MailService
+		appCfg       *config.AppConfig
+		jwtCfg       *config.JWTConfig
+		idGen        idgen.IDGenerator
+		tokenManager TokenManager
 	}
 )
 
 func NewAuthService(
 	authRepo AuthRepository,
-	argonConfigRepo vault.ArgonConfigRepository,
-	vaultRepo vault.VaultRepository,
-	userSessionRepo UserSessionRepository,
+	vaultService vault.VaultService,
 	cache cache.Store,
 	mail smtp.MailService,
 	appCfg *config.AppConfig,
@@ -71,16 +62,14 @@ func NewAuthService(
 	tokenManager TokenManager,
 ) AuthService {
 	return &authService{
-		authRepo:        authRepo,
-		argonConfigRepo: argonConfigRepo,
-		vaultRepo:       vaultRepo,
-		userSessionRepo: userSessionRepo,
-		cache:           cache,
-		mail:            mail,
-		appCfg:          appCfg,
-		jwtCfg:          jwtCfg,
-		idGen:           idGen,
-		tokenManager:    tokenManager,
+		authRepo:     authRepo,
+		vaultService: vaultService,
+		cache:        cache,
+		mail:         mail,
+		appCfg:       appCfg,
+		jwtCfg:       jwtCfg,
+		idGen:        idGen,
+		tokenManager: tokenManager,
 	}
 }
 
@@ -94,41 +83,25 @@ func (s *authService) Logout(ctx context.Context, userID int64, token string) {
 	}
 
 	tokenHash := internal.HashString(token)
-	s.userSessionRepo.RevokeSession(ctx, userID, tokenHash)
+	_ = s.authRepo.RevokeSession(ctx, userID, tokenHash)
 }
 
 func (s *authService) Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error) {
 	email := normalizeEmail(loginInput.Email)
 	if email == "" {
-		return response.LoginResponse{}, response.BadRequestError("email is required")
+		return response.LoginResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
 	}
 
 	user, err := s.authRepo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.LoginResponse{}, response.BadRequestError("invalid credentials")
+			return response.LoginResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
 		}
 		return response.LoginResponse{}, response.InternalServerError(err.Error())
 	}
 
 	if !internal.VerifyPassword([]byte(loginInput.Verifier), []byte(user.AuthVerifier)) {
-		return response.LoginResponse{}, response.BadRequestError("invalid credentials")
-	}
-
-	vault, err := s.vaultRepo.GetVaultByUserID(ctx, user.ID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.LoginResponse{}, response.BadRequestError("invalid credentials")
-		}
-		return response.LoginResponse{}, response.InternalServerError(err.Error())
-	}
-
-	argonConfig, err := s.argonConfigRepo.GetConfigByUserID(ctx, user.ID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.LoginResponse{}, response.BadRequestError("invalid credentials")
-		}
-		return response.LoginResponse{}, response.InternalServerError(err.Error())
+		return response.LoginResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
 	}
 
 	accessToken, err := s.tokenManager.GenerateAccessToken(user.ID)
@@ -141,43 +114,15 @@ func (s *authService) Login(ctx context.Context, loginInput LoginInput) (respons
 		return response.LoginResponse{}, response.InternalServerError(err.Error())
 	}
 
-	if err := s.userSessionRepo.CreateSession(ctx, user.ID, userSession); err != nil {
-		return response.LoginResponse{}, response.BadRequestError("invalid create session")
+	if err := s.authRepo.CreateSession(ctx, user.ID, userSession); err != nil {
+		return response.LoginResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid create session")
 	}
 
 	return response.LoginResponse{
-		UserID: user.ID,
-		Email:  user.Email,
-		Name:   user.Name,
-		ImgURL: user.ImgUrl,
-
-		MasterKeySalt: user.MasterKeySalt,
-
-		ArgonConfig: response.ArgonConfigResponse{
-			ID:          argonConfig.ID,
-			Iteration:   argonConfig.Iteration,
-			Memory:      argonConfig.Memory,
-			Parallelism: argonConfig.Parallelism,
-			CreatedAt:   argonConfig.CreatedAt,
-			UpdatedAt:   argonConfig.UpdatedAt,
-		},
-
-		Vault: response.VaultResponse{
-			ID:           vault.ID,
-			Timeout:      vault.Timeout,
-			TimeoutType:  string(vault.TimeoutType),
-			VaultKeySalt: vault.VaultKeySalt,
-			CreatedAt:    vault.CreatedAt,
-			UpdatedAt:    vault.UpdatedAt,
-		},
-
 		Token: response.TokenResponse{
 			AccessToken:  accessToken,
 			RefreshToken: userSession.RefreshToken,
 		},
-
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
 	}, nil
 }
 
@@ -192,7 +137,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 	}
 
 	refreshTokenHash := internal.HashString(refreshToken)
-	session, err := s.userSessionRepo.GetSessionByRefreshTokenHash(ctx, refreshTokenHash)
+	session, err := s.authRepo.GetSessionByRefreshTokenHash(ctx, refreshTokenHash)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.TokenResponse{}, response.Unauthorized()
@@ -201,7 +146,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 	}
 
 	if session.RevokeAt != nil {
-		return response.TokenResponse{}, response.BadRequestError("refresh token expired")
+		return response.TokenResponse{}, response.BadRequestError(ErrTokenExpired.Error(), "refresh token expired")
 	}
 
 	now := time.Now().UTC()
@@ -222,7 +167,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 	newRefreshTokenHash := internal.HashString(newRefreshToken)
 	expiresAt := now.Add(s.jwtCfg.Expired)
 
-	if err := s.userSessionRepo.UpdateRefreshToken(ctx, session.ID, refreshTokenHash, newRefreshTokenHash, expiresAt, now); err != nil {
+	if err := s.authRepo.UpdateRefreshToken(ctx, session.ID, refreshTokenHash, newRefreshTokenHash, expiresAt, now); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.TokenResponse{}, response.Unauthorized()
 		}
@@ -235,10 +180,30 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 	}, nil
 }
 
+func (s *authService) GetRegisterSession(ctx context.Context, session string) (response.RegisterSessionResponse, error) {
+	if session == "" {
+		return response.RegisterSessionResponse{}, response.BadRequestError(ErrSessionRequired.Error(), "session is required")
+	}
+
+	isSession, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(session))
+	if err != nil || isSession == "" {
+		return response.RegisterSessionResponse{}, response.BadRequestError(ErrSessionRequired.Error(), "session not found")
+	}
+
+	email, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(session))
+	if err != nil || email == "" {
+		return response.RegisterSessionResponse{}, response.BadRequestError(ErrSessionRequired.Error(), "session data not found")
+	}
+
+	return response.RegisterSessionResponse{
+		Email: email,
+	}, nil
+}
+
 func (s *authService) SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error {
 	email := normalizeEmail(input.Email)
 	if email == "" {
-		return response.BadRequestError("email is required")
+		return response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
 	}
 
 	exists, err := s.authRepo.EmailExists(ctx, email)
@@ -246,7 +211,7 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 		return response.InternalServerError("failed to check email")
 	}
 	if exists {
-		return response.NewAppErr(http.StatusConflict, "email already registered")
+		return response.NewAppErr(http.StatusConflict, ErrEmailAlreadyExists.Error(), "email already registered")
 	}
 
 	token, err := s.tokenManager.GenerateSecureToken(tokenByteSize)
@@ -269,13 +234,13 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 func (s *authService) VerifyEmail(ctx context.Context, token string) (string, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return "", response.BadRequestError("token is required")
+		return "", response.BadRequestError(ErrTokenExpired.Error(), "token is required")
 	}
 
 	email, err := s.cache.GetDel(ctx, s.tokenManager.RegisterVerificationKey(token))
 	if err != nil {
 		if cache.IsMiss(err) {
-			return "", response.BadRequestError("verification token is invalid or expired")
+			return "", response.BadRequestError(ErrTokenExpired.Error(), "verification token is invalid or expired")
 		}
 		return "", response.InternalServerError("failed to validate verification token")
 	}
@@ -304,7 +269,7 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 	sessionEmail, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(input.Session))
 	if err != nil {
 		if cache.IsMiss(err) {
-			return nil, response.BadRequestError("register session is invalid or expired")
+			return nil, response.BadRequestError(ErrSessionExpired.Error(), "register session is invalid or expired")
 		}
 		return nil, response.InternalServerError("failed to validate register session")
 	}
@@ -317,7 +282,7 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 		return nil, response.InternalServerError("failed to check email")
 	}
 	if exists {
-		return nil, response.NewAppErr(http.StatusConflict, "email already registered")
+		return nil, response.NewAppErr(http.StatusConflict, ErrEmailAlreadyExists.Error(), "email already registered")
 	}
 
 	user := User{
@@ -330,34 +295,22 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 		EmailVerified:    true,
 	}
 
-	argonConfig := ArgonConfig{
-		ID:          s.idGen.NewID(),
-		UserID:      user.ID,
-		Memory:      defaultArgonMemory,
-		Iterations:  defaultArgonIterations,
-		Parallelism: defaultArgonParallelism,
-	}
-
-	vault := Vault{
-		ID:           s.idGen.NewID(),
-		UserID:       user.ID,
-		Timeout:      defaultVaultTimeout,
-		TimeoutType:  defaultVaultTimeoutType,
-		VaultKeySalt: input.Vault.VaultKeySalt,
-	}
-
 	if err := s.authRepo.WithTransaction(ctx, func(repo AuthRepository) error {
 		if err := repo.CreateUser(ctx, user); err != nil {
 			return err
 		}
 
-		if err := repo.CreateArgonConfig(ctx, argonConfig); err != nil {
+		if err := s.vaultService.CreateArgonConfig(ctx, user.ID); err != nil {
 			return err
 		}
 
-		return repo.CreateVault(ctx, vault)
+		if err := s.vaultService.CreateVault(ctx, user.ID, input.VaultKeySalt); err != nil {
+			return err
+		}
+
+		return nil
 	}); err != nil {
-		return nil, response.InternalServerError("failed to register user")
+		return nil, response.BadRequestError(ErrFailedRegister.Error(), "failed to register")
 	}
 
 	if err := s.cache.Del(ctx, s.tokenManager.RegisterSessionKey(input.Session)); err != nil {
@@ -369,29 +322,29 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 
 func (s *authService) verificationLink(token string) string {
 	baseURL := strings.TrimRight(s.appCfg.FrontendURL, "/")
-	return fmt.Sprintf("%s/verify-email?token=%s", baseURL, url.QueryEscape(token))
+	return fmt.Sprintf("%s/auth/verify-email?token=%s", baseURL, url.QueryEscape(token))
 }
 
 func validateRegisterInput(input RegisterInput) error {
 	if input.Session == "" {
-		return response.BadRequestError("register session is required")
+		return response.BadRequestError(ErrSessionRequired.Error(), "register session is required")
 	}
 	if input.Email == "" {
-		return response.BadRequestError("email is required")
+		return response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
 	}
 	if input.Name == "" {
-		return response.BadRequestError("name is required")
+		return response.BadRequestError(ErrFieldNameRequired.Error(), "name is required")
 	}
 
 	base64Fields := map[string]string{
 		"authVerifier":     input.AuthVerifier,
 		"authVerifierSalt": input.AuthVerifierSalt,
 		"masterKeySalt":    input.MasterKeySalt,
-		"vaultKeySalt":     input.Vault.VaultKeySalt,
+		"vaultKeySalt":     input.VaultKeySalt,
 	}
 	for field, value := range base64Fields {
 		if !isBase64(value) {
-			return response.BadRequestError(fmt.Sprintf("%s must be a valid base64 string", field))
+			return response.BadRequestError(ErrValidation.Error(), fmt.Sprintf("%s must be a valid base64 string", field))
 		}
 	}
 

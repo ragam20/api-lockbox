@@ -10,11 +10,6 @@ type AuthRepository interface {
 	GetByEmail(ctx context.Context, email string) (User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
 	CreateUser(ctx context.Context, user User) error
-	CreateArgonConfig(ctx context.Context, argonConfig ArgonConfig) error
-	CreateVault(ctx context.Context, vault Vault) error
-}
-
-type UserSessionRepository interface {
 	RevokeSession(ctx context.Context, userID int64, tokenHash string) error
 	CreateSession(ctx context.Context, userID int64, userSession UserSession) error
 	GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error)

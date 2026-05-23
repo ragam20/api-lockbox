@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"lockbox/internal/app/auth"
+	"lockbox/internal/app/user"
 	"lockbox/internal/app/vault"
 	"lockbox/internal/cache"
 	"lockbox/internal/config"
@@ -37,7 +38,7 @@ func main() {
 
 	infraModule := fx.Module("infra",
 		fx.Provide(
-			idgen.NewSnowflakeGen,
+			idgen.NewIDGen,
 			logger.NewLogger,
 		),
 	)
@@ -55,10 +56,8 @@ func main() {
 	repositoryModule := fx.Module("repository",
 		fx.Provide(
 			repository.NewAuthRepository,
-			repository.NewArgonConfigRepository,
-			repository.NewUserSessionRepository,
+			repository.NewUserRepository,
 			repository.NewVaultRepository,
-			repository.NewVaultItemRepository,
 		),
 	)
 
@@ -67,6 +66,13 @@ func main() {
 			auth.NewTokenManager,
 			auth.NewAuthService,
 			handler.NewAuthHandler,
+		),
+	)
+
+	userModule := fx.Module("user",
+		fx.Provide(
+			user.NewUserService,
+			handler.NewUserHandler,
 		),
 	)
 
@@ -96,6 +102,7 @@ func main() {
 		appHTTPModule,
 		repositoryModule,
 		authModule,
+		userModule,
 		vaultModule,
 
 		fx.Invoke(

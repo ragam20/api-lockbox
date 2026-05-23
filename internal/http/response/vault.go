@@ -3,7 +3,7 @@ package response
 import "time"
 
 type VaultResponse struct {
-	ID           int64     `json:"id"`
+	ID           int64     `json:"id,string"`
 	Timeout      int32     `json:"timeout"`
 	TimeoutType  string    `json:"timeoutType"`
 	VaultKeySalt string    `json:"vaultKeySalt"`
@@ -12,7 +12,7 @@ type VaultResponse struct {
 }
 
 type ArgonConfigResponse struct {
-	ID          int64     `json:"id"`
+	ID          int64     `json:"id,string"`
 	Iteration   uint32    `json:"iteration"`
 	Memory      uint32    `json:"memory"`
 	Parallelism uint32    `json:"parallelism"`
@@ -21,7 +21,7 @@ type ArgonConfigResponse struct {
 }
 
 type VaultItemResponse struct {
-	ID              int64      `json:"id"`
+	ID              int64      `json:"id,string"`
 	VaultID         int64      `json:"vaultId"`
 	Title           string     `json:"title"`
 	ItemType        string     `json:"itemType"`

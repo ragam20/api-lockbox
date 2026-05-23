@@ -8,6 +8,8 @@ import (
 	"lockbox/internal/config"
 
 	"github.com/golang-jwt/jwt/v5"
+
+	"github.com/google/uuid"
 )
 
 func TestGenerateUserSessionStoresRefreshTokenHash(t *testing.T) {
@@ -90,4 +92,8 @@ type staticIDGen struct {
 
 func (g staticIDGen) NewID() int64 {
 	return g.id
+}
+
+func (g staticIDGen) NewUUIDV7() (uuid.UUID, error) {
+	return uuid.Nil, nil
 }
