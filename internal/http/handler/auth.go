@@ -67,7 +67,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req request.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 
@@ -125,7 +125,7 @@ func (h *AuthHandler) GetRegisterSession(c *gin.Context) {
 func (h *AuthHandler) SendVerifyLink(c *gin.Context) {
 	var req request.SendVerifyLinkRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 
@@ -154,7 +154,7 @@ func (h *AuthHandler) VerifyEmail(c *gin.Context) {
 func (h *AuthHandler) Register(c *gin.Context) {
 	var req request.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 

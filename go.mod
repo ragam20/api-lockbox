@@ -6,6 +6,7 @@ require (
 	github.com/bwmarrin/snowflake v0.3.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-gonic/gin v1.11.0
+	github.com/google/uuid v1.6.0
 	github.com/mssola/useragent v1.0.0
 	github.com/redis/go-redis/v9 v9.19.0
 	github.com/rs/zerolog v1.34.0

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/handler"
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/response"
@@ -15,6 +16,7 @@ func NewRoutes(
 	g *gin.Engine,
 	authHandler *handler.AuthHandler,
 	vaultHandler *handler.VaultHandler,
+	userHandler *handler.UserHandler,
 	verifyJWT *middleware.VerifyJWTMiddleware,
 	requestTimeout *middleware.RequestTimeoutMiddleware,
 ) {
@@ -51,15 +53,23 @@ func NewRoutes(
 		vaultAPI.POST("/items/:id/archive", vaultHandler.ArchiveVaultItem)
 		vaultAPI.POST("/items/:id/unarchive", vaultHandler.UnarchiveVaultItem)
 		vaultAPI.DELETE("/items/:id", vaultHandler.DeleteVaultItem)
+		vaultAPI.GET("/argon-config", vaultHandler.GetArgonConfig)
+	}
+
+	userAPI := api.Group("/user",
+		middleware.NewRequestTimeoutMiddleware().Handle(5*time.Second),
+		verifyJWT.Handle())
+	{
+		userAPI.GET("", userHandler.GetUser)
 	}
 
 	g.NoRoute(func(c *gin.Context) {
-		appErr := response.NotFoundError("route not found")
-		c.JSON(appErr.Status, response.Error(appErr.Status, appErr.Message, appErr.Timestamp))
+		appErr := response.NotFoundError(apphttp.ErrTransport.Error(), "route not found")
+		c.JSON(appErr.Status, response.Error(appErr.Status, appErr.Code, appErr.Message, appErr.Timestamp))
 	})
 
 	g.NoMethod(func(c *gin.Context) {
-		appErr := response.NewAppErr(http.StatusMethodNotAllowed, "method not allowed")
-		c.JSON(appErr.Status, response.Error(appErr.Status, appErr.Message, appErr.Timestamp))
+		appErr := response.NewAppErr(http.StatusMethodNotAllowed, apphttp.ErrTransport.Error(), "method not allowed")
+		c.JSON(appErr.Status, response.Error(appErr.Status, appErr.Code, appErr.Message, appErr.Timestamp))
 	})
 }

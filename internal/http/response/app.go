@@ -43,9 +43,10 @@ func Success(c *gin.Context, status int, message string, data any) {
 	})
 }
 
-func Error(status int, message string, timestamp time.Time) gin.H {
+func Error(status int, code, message string, timestamp time.Time) gin.H {
 	return gin.H{
 		"success":   false,
+		"code":      code,
 		"message":   message,
 		"timestamp": timestamp,
 	}

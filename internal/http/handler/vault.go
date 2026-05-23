@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"lockbox/internal/app/vault"
+	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/request"
 	"lockbox/internal/http/response"
 
@@ -17,6 +18,29 @@ type VaultHandler struct {
 
 func NewVaultHandler(vaultService vault.VaultService) *VaultHandler {
 	return &VaultHandler{vaultService: vaultService}
+}
+
+func (h *VaultHandler) GetArgonConfig(c *gin.Context) {
+	userID, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	m, err := h.vaultService.GetArgonConfig(c.Request.Context(), userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success get argon config", response.ArgonConfigResponse{
+		ID:          m.ID,
+		Iteration:   m.Iterations,
+		Memory:      m.Memory,
+		Parallelism: m.Parallelism,
+		CreatedAt:   m.CreatedAt,
+		UpdatedAt:   m.UpdatedAt,
+	})
 }
 
 func (h *VaultHandler) GetVaultItem(c *gin.Context) {
@@ -34,7 +58,7 @@ func (h *VaultHandler) GetVaultItem(c *gin.Context) {
 
 	vaultType := c.Query("type")
 	if !vault.CheckVaultType(vaultType) {
-		_ = c.Error(response.BadRequestError("vault type must be password or note"))
+		_ = c.Error(response.BadRequestError(vault.ErrVaultType.Error(), "vault type must be password or note"))
 		return
 	}
 
@@ -115,7 +139,7 @@ func (h *VaultHandler) GetVaultItemByID(c *gin.Context) {
 func (h *VaultHandler) CreateVaultItem(c *gin.Context) {
 	var req request.VaultItemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 
@@ -145,7 +169,7 @@ func (h *VaultHandler) CreateVaultItem(c *gin.Context) {
 func (h *VaultHandler) UpdateVaultItem(c *gin.Context) {
 	var req request.VaultItemRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(response.BadRequestError("invalid request body"))
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
 		return
 	}
 
@@ -247,7 +271,7 @@ func (h *VaultHandler) DeleteVaultItem(c *gin.Context) {
 func vaultItemIDFromParam(c *gin.Context) (int64, error) {
 	itemID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || itemID <= 0 {
-		return 0, response.BadRequestError("invalid vault item id")
+		return 0, response.BadRequestError(apphttp.ErrTransport.Error(), "invalid vault item id")
 	}
 
 	return itemID, nil

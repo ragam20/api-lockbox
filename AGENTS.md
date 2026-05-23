@@ -84,7 +84,7 @@ internal/app/auth
 
 #### internal/app/(feature)
 
-Every feature should contain:
+Every feature should contains:
 
 - repository interface
 - service.go (business logic)
@@ -167,7 +167,7 @@ Use structured JSON responses.
 {
   "success": true,
   "message": "Success",
-  "timestamp": "",
+  "timestamp": "---",
   "data": {}
 }
 ```
@@ -177,6 +177,7 @@ Use structured JSON responses.
 ```json id="jlwmrw"
 {
   "success": false,
+  "code": "AUTH_INVALID_TOKEN",
   "message": "Invalid token",
   "timestamp": ""
 }

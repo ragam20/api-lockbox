@@ -100,12 +100,12 @@ func (m *tokenManager) ValidateAccessToken(accessToken string) (*JWTUser, error)
 	}
 
 	if !m.checkClaims(claims, "userId", "exp") {
-		return nil, response.BadRequestError("invalid jwt")
+		return nil, response.BadRequestError(ErrTokenExpired.Error(), "invalid jwt")
 	}
 
 	uidFloat, ok := claims["userId"].(float64)
 	if !ok {
-		return nil, response.BadRequestError("invalid userId claim")
+		return nil, response.BadRequestError(ErrInvalidToken.Error(), "invalid userId claim")
 	}
 
 	return &JWTUser{
@@ -125,26 +125,26 @@ func (m *tokenManager) generateJWT(jwtClaims jwt.MapClaims, secret string) (stri
 func (m *tokenManager) validateJWT(currToken string, secret string) (jwt.MapClaims, error) {
 	j, err := jwt.Parse(currToken, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, response.BadRequestError("invalid jwt signing method")
+			return nil, response.BadRequestError(ErrInvalidToken.Error(), "invalid jwt signing method")
 		}
 		return []byte(secret), nil
 	})
 	if err != nil || !j.Valid {
-		return nil, response.BadRequestError("invalid jwt")
+		return nil, response.BadRequestError(ErrInvalidToken.Error(), "invalid jwt")
 	}
 
 	claims, ok := j.Claims.(jwt.MapClaims)
 	if !ok {
-		return nil, response.BadRequestError("invalid jwt claims")
+		return nil, response.BadRequestError(ErrInvalidToken.Error(), "invalid jwt claims")
 	}
 
 	exp, ok := claims["exp"].(float64)
 	if !ok {
-		return nil, response.BadRequestError("invalid jwt exp claim")
+		return nil, response.BadRequestError(ErrInvalidToken.Error(), "invalid jwt exp claim")
 	}
 
 	if int64(exp) < time.Now().Unix() {
-		return nil, response.BadRequestError("token expired")
+		return nil, response.BadRequestError(ErrTokenExpired.Error(), "token expired")
 	}
 
 	return claims, nil

@@ -14,6 +14,7 @@ const (
 
 type Vault struct {
 	ID           int64
+	UserID       int64
 	Timeout      int32
 	TimeoutType  VaultTimeoutType
 	VaultKeySalt string
@@ -44,7 +45,7 @@ type VaultItem struct {
 
 type ArgonConfig struct {
 	ID          int64
-	Iteration   uint32
+	Iterations  uint32
 	Memory      uint32
 	Parallelism uint32
 	CreatedAt   time.Time

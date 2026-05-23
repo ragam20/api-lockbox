@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/response"
 
 	"github.com/gin-gonic/gin"
@@ -25,8 +26,8 @@ func (m *RequestTimeoutMiddleware) Handle(timeout time.Duration) gin.HandlerFunc
 		c.Next()
 
 		if ctx.Err() == context.DeadlineExceeded {
-			appErr := response.NewAppErr(http.StatusBadGateway, "request timeout")
-			c.AbortWithStatusJSON(appErr.Status, response.Error(appErr.Status, appErr.Message, appErr.Timestamp))
+			appErr := response.NewAppErr(http.StatusBadGateway, apphttp.ErrTransport.Error(), "request timeout")
+			c.AbortWithStatusJSON(appErr.Status, response.Error(appErr.Status, appErr.Code, appErr.Message, appErr.Timestamp))
 		}
 	}
 }

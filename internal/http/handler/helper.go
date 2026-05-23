@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"lockbox/internal/constant"
+	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/response"
 
 	"github.com/gin-gonic/gin"
@@ -27,7 +28,7 @@ func GetPagination(c *gin.Context) (Pagination, error) {
 	if pageQ := c.Query("page"); pageQ != "" {
 		p, err := strconv.Atoi(pageQ)
 		if err != nil {
-			return Pagination{}, response.BadRequestError("page must be a number")
+			return Pagination{}, response.BadRequestError(apphttp.ErrTransport.Error(), "page must be a number")
 		}
 		page = p
 	}
@@ -35,7 +36,7 @@ func GetPagination(c *gin.Context) (Pagination, error) {
 	if limitQ := c.Query("limit"); limitQ != "" {
 		l, err := strconv.Atoi(limitQ)
 		if err != nil {
-			return Pagination{}, response.BadRequestError("limit must be a number")
+			return Pagination{}, response.BadRequestError(apphttp.ErrTransport.Error(), "limit must be a number")
 		}
 		limit = l
 	}
@@ -66,7 +67,7 @@ func archiveQuery(c *gin.Context) (bool, error) {
 
 	archive, err := strconv.ParseBool(archiveQ)
 	if err != nil {
-		return false, response.BadRequestError("archive must be a boolean")
+		return false, response.BadRequestError(apphttp.ErrTransport.Error(), "archive must be a boolean")
 	}
 
 	return archive, nil

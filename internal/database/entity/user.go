@@ -33,7 +33,7 @@ func (e UserEntity) ToDomainUser() auth.User {
 		Name:             e.Name,
 		Email:            e.Email,
 		EmailVerified:    e.EmailVerified,
-		ImgUrl:           e.ImgURL,
+		ImgURL:           e.ImgURL,
 		MasterKeySalt:    e.MasterKeySalt,
 		AuthVerifier:     e.AuthVerifier,
 		AuthVerifierSalt: e.AuthVerifierSalt,

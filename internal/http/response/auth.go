@@ -5,16 +5,13 @@ type RegisterSessionResponse struct {
 }
 
 type RegisterResponse struct {
-	ID    int64  `json:"id"`
+	ID    int64  `json:"id,string"`
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
 
 type LoginResponse struct {
-	User        UserResponse        `json:"user"`
-	Vault       VaultResponse       `json:"vault"`
-	ArgonConfig ArgonConfigResponse `json:"argonConfig"`
-	Token       TokenResponse       `json:"token"`
+	Token TokenResponse `json:"token"`
 }
 
 type TokenResponse struct {

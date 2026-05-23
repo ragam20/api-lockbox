@@ -27,7 +27,7 @@ func (ArgonConfigEntity) TableName() string {
 func (e ArgonConfigEntity) ToDomain() vault.ArgonConfig {
 	return vault.ArgonConfig{
 		ID:          e.ID,
-		Iteration:   e.Time,
+		Iterations:  e.Time,
 		Parallelism: e.Parallelism,
 		Memory:      e.Memory,
 		CreatedAt:   e.CreatedAt,
