@@ -2,8 +2,8 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/shortivo_app ./cmd/api"
-bin = "./tmp/shortivo_app"
+cmd = "go build -o ./tmp/api_lockbox ./cmd/api"
+bin = "./tmp/api_lockbox"
 include_ext = ["go"]
 exclude_dir = ["vendor", "tmp", "migrations", "supabase"]
 delay = 200
