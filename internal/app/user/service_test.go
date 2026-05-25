@@ -12,14 +12,14 @@ import (
 func TestNewUserServiceWiresRepository(t *testing.T) {
 	repo := &mockUserRepo{
 		user: User{
-			ID:            7,
-			Name:          "Test User",
-			Email:         "user@example.com",
-			EmailVerified: true,
-			MasterKeySalt: "master-salt",
+			ID:               7,
+			Name:             "Test User",
+			Email:            "user@example.com",
+			EmailVerified:    true,
+			MasterKeySalt:    "master-salt",
 			AuthVerifierSalt: "auth-salt",
-			CreatedAt:     time.Unix(1, 0).UTC(),
-			UpdatedAt:     time.Unix(2, 0).UTC(),
+			CreatedAt:        time.Unix(1, 0).UTC(),
+			UpdatedAt:        time.Unix(2, 0).UTC(),
 		},
 	}
 
@@ -75,8 +75,8 @@ func TestGetUserMapsInternalError(t *testing.T) {
 }
 
 type mockUserRepo struct {
-	user           User
-	err            error
+	user             User
+	err              error
 	calledWithUserID int64
 }
 
