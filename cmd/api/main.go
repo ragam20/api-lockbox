@@ -10,6 +10,7 @@ import (
 	"lockbox/internal/config"
 	"lockbox/internal/database"
 	"lockbox/internal/database/repository"
+	dbtx "lockbox/internal/database/transaction"
 	appHttp "lockbox/internal/http"
 	"lockbox/internal/http/handler"
 	"lockbox/internal/http/middleware"
@@ -40,16 +41,17 @@ func main() {
 		fx.Provide(
 			idgen.NewIDGen,
 			logger.NewLogger,
+			smtp.NewSMTPConfig,
+			smtp.NewMailService,
 		),
 	)
 
 	databaseModule := fx.Module("database",
 		fx.Provide(
 			database.NewPostgresConnection,
+			dbtx.NewTransactionManager,
 			cache.NewRedisClient,
 			cache.NewStore,
-			smtp.NewSMTPConfig,
-			smtp.NewMailService,
 		),
 	)
 

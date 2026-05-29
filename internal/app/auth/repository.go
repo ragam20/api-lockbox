@@ -3,10 +3,12 @@ package auth
 import (
 	"context"
 	"time"
+
+	"gorm.io/gorm"
 )
 
 type AuthRepository interface {
-	WithTransaction(ctx context.Context, fn func(repo AuthRepository) error) error
+	WithTx(tx *gorm.DB) AuthRepository
 	GetByEmail(ctx context.Context, email string) (User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
 	CreateUser(ctx context.Context, user User) error

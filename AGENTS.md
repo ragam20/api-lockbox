@@ -19,29 +19,29 @@ Users never send raw passwords to the backend. The frontend derives cryptographi
 
 # Project Structure
 
-```txt id="jlwm4x"
+```md
 .
 ├── cmd
-│   └── api
+│ └── api
 └── internal
-    ├── app
-    │   └── auth
-    ├── cache
-    ├── config
-    ├── constant
-    ├── database
-    │   ├── entity
-    │   └── repository
-    ├── http
-    │   ├── handler
-    │   ├── middleware
-    │   ├── request
-    │   ├── response
-    │   ├── router
-    │   └── server
-    ├── idgen
-    ├── logger
-    └── smtp
+├── app
+│ └── auth
+├── cache
+├── config
+├── constant
+├── database
+│ ├── entity
+│ └── repository
+├── http
+│ ├── handler
+│ ├── middleware
+│ ├── request
+│ ├── response
+│ ├── router
+│ └── server
+├── idgen
+├── logger
+└── smtp
 ```
 
 ---

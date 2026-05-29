@@ -1,8 +1,14 @@
 package vault
 
-import "context"
+import (
+	"context"
+
+	"gorm.io/gorm"
+)
 
 type VaultRepository interface {
+	WithTx(tx *gorm.DB) VaultRepository
+	GetVault(ctx context.Context, userID int64) (Vault, error)
 	GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error)
 	GetVaultByUserID(ctx context.Context, userID int64) (Vault, error)
 	GetConfigByUserID(ctx context.Context, userID int64) (ArgonConfig, error)

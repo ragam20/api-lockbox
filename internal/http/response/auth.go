@@ -1,5 +1,15 @@
 package response
 
+type RequestOTPResponse struct {
+	ExpiresIn int `json:"expiresIn"`
+}
+
+type VerifyOTPResponse struct {
+	Email      string        `json:"email"`
+	IsVerified bool          `json:"isVerified"`
+	Token      TokenResponse `json:"token"`
+}
+
 type RegisterSessionResponse struct {
 	Email string `json:"email"`
 }
@@ -10,9 +20,7 @@ type RegisterResponse struct {
 	Name  string `json:"name"`
 }
 
-type LoginResponse struct {
-	Token TokenResponse `json:"token"`
-}
+type LoginResponse struct{}
 
 type TokenResponse struct {
 	AccessToken  string `json:"accessToken"`

@@ -35,7 +35,9 @@ func NewRoutes(
 	authAPI.Use(middleware.NewRequestTimeoutMiddleware().Handle(5 * time.Second))
 	{
 		authAPI.POST("/logout", verifyJWT.Handle(), authHandler.Logout)
-		authAPI.POST("/login", authHandler.Login)
+		authAPI.POST("/request-otp", authHandler.RequestOTP)
+		authAPI.POST("/verify-otp", authHandler.VerifyOTP)
+		authAPI.POST("/unlock", verifyJWT.Handle(), authHandler.Unlock)
 		authAPI.POST("/refresh-token", authHandler.RefreshToken)
 		authAPI.POST("/register", authHandler.Register)
 		authAPI.POST("/register/request-verification-link", authHandler.SendVerifyLink)
@@ -44,8 +46,9 @@ func NewRoutes(
 	}
 
 	vaultAPI := api.Group("/vault")
-	vaultAPI.Use(verifyJWT.Handle(), requestTimeout.Handle(5*time.Second))
+	vaultAPI.Use(requestTimeout.Handle(5*time.Second), verifyJWT.Handle())
 	{
+		vaultAPI.GET("", vaultHandler.GetVault)
 		vaultAPI.POST("/items", vaultHandler.CreateVaultItem)
 		vaultAPI.GET("/items", vaultHandler.GetVaultItem)
 		vaultAPI.GET("/items/:id", vaultHandler.GetVaultItemByID)

@@ -20,6 +20,29 @@ func NewVaultHandler(vaultService vault.VaultService) *VaultHandler {
 	return &VaultHandler{vaultService: vaultService}
 }
 
+func (h *VaultHandler) GetVault(c *gin.Context) {
+	userID, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	vault, err := h.vaultService.GetVault(c.Request.Context(), userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success get vault", response.VaultResponse{
+		ID:           vault.ID,
+		Timeout:      vault.Timeout,
+		TimeoutType:  string(vault.TimeoutType),
+		VaultKeySalt: vault.VaultKeySalt,
+		CreatedAt:    vault.CreatedAt,
+		UpdatedAt:    vault.UpdatedAt,
+	})
+}
+
 func (h *VaultHandler) GetArgonConfig(c *gin.Context) {
 	userID, err := userIDFromContext(c)
 	if err != nil {
