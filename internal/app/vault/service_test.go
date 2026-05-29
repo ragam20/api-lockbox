@@ -119,7 +119,7 @@ func TestGetVaultItemRejectsInvalidType(t *testing.T) {
 func TestGetVaultItemTrimsSearchAndReturnsResult(t *testing.T) {
 	repo := &mockVaultRepo{
 		getVaultItemResult: GetVaultItemsResult{
-			Items: []VaultItem{{ID: 1, Title: "First"}},
+			Items:      []VaultItem{{ID: 1, Title: "First"}},
 			TotalItems: 1,
 		},
 	}
@@ -340,8 +340,17 @@ type mockVaultRepo struct {
 	deleteVaultItemErr    error
 
 	archivedVaultItem   VaultItem
-	unarchivedVaultItem  VaultItem
-	updatedVaultItem     VaultItem
+	unarchivedVaultItem VaultItem
+	updatedVaultItem    VaultItem
+}
+
+func (r *mockVaultRepo) WithTx(tx *gorm.DB) VaultRepository {
+	return r
+}
+
+func (r *mockVaultRepo) GetVault(ctx context.Context, userID int64) (Vault, error) {
+	r.getVaultByUserIDUserID = userID
+	return r.getVaultByUserIDResult, r.getVaultByUserIDErr
 }
 
 func (r *mockVaultRepo) GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error) {
@@ -432,4 +441,3 @@ func mustVaultAppErr(t *testing.T, err error) *appResponse.AppErrResponse {
 }
 
 func timePtr(t time.Time) *time.Time { return &t }
-

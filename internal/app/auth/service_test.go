@@ -45,7 +45,7 @@ func TestLoginRejectsInvalidVerifier(t *testing.T) {
 
 func TestLoginRejectsUnknownUserWithInvalidCredentialCode(t *testing.T) {
 	service := &authService{
-		authRepo: &mockAuthRepo{getByEmailErr: gorm.ErrRecordNotFound},
+		authRepo:     &mockAuthRepo{getByEmailErr: gorm.ErrRecordNotFound},
 		tokenManager: &mockTokenManager{},
 	}
 
@@ -69,8 +69,8 @@ func TestLoginRejectsUnknownUserWithInvalidCredentialCode(t *testing.T) {
 func TestRefreshTokenRotatesSessionAndReturnsNewTokens(t *testing.T) {
 	store := newMockCache()
 	tokenManager := &mockTokenManager{
-		accessToken:       "new-access-token",
-		secureToken:       "new-refresh-token",
+		accessToken: "new-access-token",
+		secureToken: "new-refresh-token",
 	}
 	service := &authService{
 		authRepo: &mockAuthRepo{
@@ -121,7 +121,7 @@ type mockAuthRepo struct {
 	sessionErr       error
 	updateErr        error
 
-	createdUser     User
+	createdUser      User
 	createdSession   UserSession
 	createdSessionID int64
 
@@ -131,15 +131,15 @@ type mockAuthRepo struct {
 	updateExpiresAt time.Time
 	updateLastUsed  time.Time
 
-	revokedUserID   int64
+	revokedUserID    int64
 	revokedTokenHash string
 
 	withTxCalls int
 }
 
-func (r *mockAuthRepo) WithTransaction(ctx context.Context, fn func(repo AuthRepository) error) error {
+func (r *mockAuthRepo) WithTx(tx *gorm.DB) AuthRepository {
 	r.withTxCalls++
-	return fn(r)
+	return r
 }
 
 func (r *mockAuthRepo) GetByEmail(ctx context.Context, email string) (User, error) {
@@ -196,7 +196,7 @@ type mockTokenManager struct {
 
 	generateAccessTokenErr error
 	generateUserSessionErr error
-	generateSecureTokenErr  error
+	generateSecureTokenErr error
 
 	generateUserSessionArgs struct {
 		ipAddress string

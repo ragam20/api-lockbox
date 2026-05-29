@@ -16,7 +16,7 @@ type userService struct {
 }
 
 func NewUserService(userRepo UserRepository) UserService {
-	return &userService{}
+	return &userService{userRepo: userRepo}
 }
 
 func (s *userService) GetUser(ctx context.Context, userID int64) (User, error) {

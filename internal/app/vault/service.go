@@ -24,6 +24,7 @@ const (
 
 type (
 	VaultService interface {
+		GetVault(ctx context.Context, userID int64) (Vault, error)
 		GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error)
 		CreateVault(ctx context.Context, userID int64, vaultKeySalt string) error
 		CreateArgonConfig(ctx context.Context, userID int64) error
@@ -49,6 +50,18 @@ func NewVaultService(vaultRepo VaultRepository, idGen idgen.IDGenerator) VaultSe
 	}
 }
 
+func (s *vaultService) GetVault(ctx context.Context, userID int64) (Vault, error) {
+	vault, err := s.vaultRepo.GetVault(ctx, userID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return Vault{}, response.BadRequestError(ErrNotFound.Error(), "vault not found")
+		}
+		return Vault{}, response.InternalServerError(err.Error())
+	}
+
+	return vault, nil
+}
+
 func (s *vaultService) GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error) {
 	conf, err := s.vaultRepo.GetArgonConfig(ctx, userID)
 	if err != nil {
@@ -62,12 +75,7 @@ func (s *vaultService) GetArgonConfig(ctx context.Context, userID int64) (ArgonC
 }
 
 func (s *vaultService) CreateVault(ctx context.Context, userID int64, vaultKeySalt string) error {
-	vault := Vault{
-		ID:           s.idGen.NewID(),
-		Timeout:      defaultVaultTimeout,
-		TimeoutType:  defaultVaultTimeoutType,
-		VaultKeySalt: vaultKeySalt,
-	}
+	vault := NewDefaultVault(s.idGen.NewID(), vaultKeySalt)
 
 	if err := s.vaultRepo.CreateVault(ctx, vault, userID); err != nil {
 		return err
@@ -77,12 +85,7 @@ func (s *vaultService) CreateVault(ctx context.Context, userID int64, vaultKeySa
 }
 
 func (s *vaultService) CreateArgonConfig(ctx context.Context, userID int64) error {
-	argonConfig := ArgonConfig{
-		ID:          s.idGen.NewID(),
-		Memory:      defaultArgonMemory,
-		Iterations:  defaultArgonIterations,
-		Parallelism: defaultArgonParallelism,
-	}
+	argonConfig := NewDefaultArgonConfig(s.idGen.NewID())
 
 	if err := s.vaultRepo.CreateArgonConfig(ctx, argonConfig, userID); err != nil {
 		return err

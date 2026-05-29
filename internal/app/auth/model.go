@@ -27,13 +27,17 @@ type SendVerificationLinkInput struct {
 	Email string
 }
 
-type LoginInput struct {
-	UserID    int64
+type VerifyOTPInput struct {
 	Email     string
-	Verifier  string
+	OTP       string
 	UserAgent string
 	IPAddress string
 	Device    string
+}
+
+type LoginInput struct {
+	Email    string
+	Verifier string
 }
 
 type RegisterInput struct {

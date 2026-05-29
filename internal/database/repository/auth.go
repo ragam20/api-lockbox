@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"lockbox/internal/app/auth"
@@ -18,10 +19,8 @@ func NewAuthRepository(db *gorm.DB) auth.AuthRepository {
 	return &authRepository{BaseRepository: NewBaseRepository(db)}
 }
 
-func (r *authRepository) WithTransaction(ctx context.Context, fn func(repo auth.AuthRepository) error) error {
-	return r.BaseRepository.WithTransaction(ctx, func(tx *gorm.DB) error {
-		return fn(&authRepository{BaseRepository: NewBaseRepository(tx)})
-	})
+func (r *authRepository) WithTx(tx *gorm.DB) auth.AuthRepository {
+	return &authRepository{BaseRepository: NewBaseRepository(tx)}
 }
 
 func (r *authRepository) EmailExists(ctx context.Context, email string) (bool, error) {
@@ -39,6 +38,9 @@ func (r *authRepository) EmailExists(ctx context.Context, email string) (bool, e
 func (r *authRepository) GetByEmail(ctx context.Context, email string) (auth.User, error) {
 	var e entity.UserEntity
 	if err := r.DB(ctx).Where("email = ?", email).First(&e).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return auth.User{}, auth.ErrUserNotFound
+		}
 		return auth.User{}, err
 	}
 

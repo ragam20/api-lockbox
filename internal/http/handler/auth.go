@@ -36,6 +36,46 @@ func NewAuthHandler(
 	}
 }
 
+func (h *AuthHandler) RequestOTP(c *gin.Context) {
+	var req request.RequestOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
+		return
+	}
+
+	resp, err := h.authService.RequestOTP(c.Request.Context(), req.Email)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "otp sent", resp)
+}
+
+func (h *AuthHandler) VerifyOTP(c *gin.Context) {
+	var req request.VerifyOTPRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
+		return
+	}
+
+	result, err := h.authService.VerifyOTP(c.Request.Context(), auth.VerifyOTPInput{
+		Email:     req.Email,
+		OTP:       req.OTP,
+		UserAgent: c.Request.UserAgent(),
+		IPAddress: c.ClientIP(),
+		Device:    loginDevice(c.Request.UserAgent()),
+	})
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	h.setAuthCookies(c, result.Token)
+
+	response.Success(c, http.StatusOK, "otp verified", result)
+}
+
 func (h *AuthHandler) Logout(c *gin.Context) {
 	userID, err := userIDFromContext(c)
 	if err != nil {
@@ -64,7 +104,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	response.Success(c, http.StatusOK, "success logout", true)
 }
 
-func (h *AuthHandler) Login(c *gin.Context) {
+func (h *AuthHandler) Unlock(c *gin.Context) {
 	var req request.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
@@ -72,18 +112,13 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	result, err := h.authService.Login(c.Request.Context(), auth.LoginInput{
-		Email:     req.Email,
-		Verifier:  req.Verifier,
-		UserAgent: c.Request.UserAgent(),
-		IPAddress: c.ClientIP(),
-		Device:    loginDevice(c.Request.UserAgent()),
+		Email:    req.Email,
+		Verifier: req.Verifier,
 	})
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-
-	h.setAuthCookies(c, result.Token)
 
 	response.Success(c, http.StatusOK, "login success", result)
 }

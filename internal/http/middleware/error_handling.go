@@ -29,6 +29,7 @@ func (m *ErrorMiddleware) Handle() gin.HandlerFunc {
 
 		err := c.Errors.Last().Err
 		status := http.StatusInternalServerError
+		code := "INTERNAL_SERVER_ERROR"
 		msg := "internal server error"
 		timestamp := time.Now().UTC()
 
@@ -47,12 +48,14 @@ func (m *ErrorMiddleware) Handle() gin.HandlerFunc {
 			}
 
 			if status >= 400 && status < 500 {
+				code = appErr.Code
 				msg = appErr.Message
 			}
 		}
 
 		c.AbortWithStatusJSON(status, gin.H{
 			"success":   false,
+			"code":      code,
 			"message":   msg,
 			"timestamp": timestamp,
 		})

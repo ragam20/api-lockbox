@@ -52,6 +52,24 @@ type ArgonConfig struct {
 	UpdatedAt   time.Time
 }
 
+func NewDefaultVault(id int64, vaultKeySalt string) Vault {
+	return Vault{
+		ID:           id,
+		Timeout:      defaultVaultTimeout,
+		TimeoutType:  defaultVaultTimeoutType,
+		VaultKeySalt: vaultKeySalt,
+	}
+}
+
+func NewDefaultArgonConfig(id int64) ArgonConfig {
+	return ArgonConfig{
+		ID:          id,
+		Memory:      defaultArgonMemory,
+		Iterations:  defaultArgonIterations,
+		Parallelism: defaultArgonParallelism,
+	}
+}
+
 type CreateVaultItemInput struct {
 	UserID          int64
 	Title           string

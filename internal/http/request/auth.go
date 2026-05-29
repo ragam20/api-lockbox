@@ -9,6 +9,15 @@ type SendVerifyLinkRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+type RequestOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type VerifyOTPRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	OTP   string `json:"otp" binding:"required,len=6,numeric"`
+}
+
 type RegisterSessionRequest struct {
 	Session string `json:"session" binding:"required"`
 }

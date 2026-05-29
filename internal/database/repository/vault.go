@@ -21,6 +21,29 @@ func NewVaultRepository(db *gorm.DB) vault.VaultRepository {
 	return &vaultRepository{BaseRepository: BaseRepository{db}}
 }
 
+func (r *vaultRepository) WithTx(tx *gorm.DB) vault.VaultRepository {
+	return &vaultRepository{BaseRepository: BaseRepository{tx}}
+}
+
+func (r *vaultRepository) GetVault(ctx context.Context, userID int64) (vault.Vault, error) {
+	var e entity.VaultEntity
+	if err := r.DB(ctx).Where("user_id = ?", userID).First(&e).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return vault.Vault{}, vault.ErrNotFound
+		}
+		return vault.Vault{}, err
+	}
+
+	return vault.Vault{
+		ID:           e.ID,
+		Timeout:      e.Timeout,
+		TimeoutType:  vault.VaultTimeoutType(e.TimeoutType),
+		VaultKeySalt: e.VaultKeySalt,
+		CreatedAt:    e.CreatedAt,
+		UpdatedAt:    e.UpdatedAt,
+	}, nil
+}
+
 func (r *vaultRepository) GetArgonConfig(ctx context.Context, userID int64) (vault.ArgonConfig, error) {
 	var e entity.ArgonConfigEntity
 	if err := r.DB(ctx).Where("user_id = ?", userID).First(&e).Error; err != nil {

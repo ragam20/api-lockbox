@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
@@ -14,6 +16,7 @@ import (
 	"lockbox/internal/app/vault"
 	"lockbox/internal/cache"
 	"lockbox/internal/config"
+	dbtx "lockbox/internal/database/transaction"
 	"lockbox/internal/http/response"
 	"lockbox/internal/idgen"
 	"lockbox/internal/smtp"
@@ -24,15 +27,20 @@ import (
 const (
 	verificationTokenTTL    = 10 * time.Minute
 	registerSessionTTL      = 5 * time.Minute
+	otpTTL                  = 1*time.Minute + (10 * time.Second)
 	externalResourceTimeout = 5 * time.Second
 
-	tokenByteSize = 32
+	otpDigits           = 6
+	otpExpiresInSeconds = 60
+	tokenByteSize       = 32
 )
 
 type (
 	AuthService interface {
+		RequestOTP(ctx context.Context, email string) (response.RequestOTPResponse, error)
+		VerifyOTP(ctx context.Context, input VerifyOTPInput) (response.VerifyOTPResponse, error)
 		Logout(ctx context.Context, userID int64, token string)
-		Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error)
+		Login(ctx context.Context, loginInput LoginInput) (bool, error)
 		RefreshToken(ctx context.Context, refreshToken string) (response.TokenResponse, error)
 		GetRegisterSession(ctx context.Context, session string) (response.RegisterSessionResponse, error)
 		SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error
@@ -40,8 +48,9 @@ type (
 		Register(ctx context.Context, input RegisterInput) (*User, error)
 	}
 	authService struct {
+		txManager    dbtx.TransactionManager
 		authRepo     AuthRepository
-		vaultService vault.VaultService
+		vaultRepo    vault.VaultRepository
 		cache        cache.Store
 		mail         smtp.MailService
 		appCfg       *config.AppConfig
@@ -52,8 +61,9 @@ type (
 )
 
 func NewAuthService(
+	txManager dbtx.TransactionManager,
 	authRepo AuthRepository,
-	vaultService vault.VaultService,
+	vaultRepo vault.VaultRepository,
 	cache cache.Store,
 	mail smtp.MailService,
 	appCfg *config.AppConfig,
@@ -62,8 +72,9 @@ func NewAuthService(
 	tokenManager TokenManager,
 ) AuthService {
 	return &authService{
+		txManager:    txManager,
 		authRepo:     authRepo,
-		vaultService: vaultService,
+		vaultRepo:    vaultRepo,
 		cache:        cache,
 		mail:         mail,
 		appCfg:       appCfg,
@@ -71,6 +82,93 @@ func NewAuthService(
 		idGen:        idGen,
 		tokenManager: tokenManager,
 	}
+}
+
+func (s *authService) RequestOTP(ctx context.Context, email string) (response.RequestOTPResponse, error) {
+	email = normalizeEmail(email)
+	if email == "" {
+		return response.RequestOTPResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
+	}
+
+	isEmailExist, _ := s.authRepo.EmailExists(ctx, email)
+	if !isEmailExist {
+		return response.RequestOTPResponse{}, response.BadRequestError(ErrUserNotFound.Error(), "email not found")
+	}
+
+	otp, err := generateOTP()
+	if err != nil {
+		return response.RequestOTPResponse{}, response.InternalServerError("failed to generate otp")
+	}
+
+	if err := s.cache.Set(ctx, otpCacheKey(email), otp, otpTTL); err != nil {
+		return response.RequestOTPResponse{}, response.InternalServerError("failed to store otp")
+	}
+
+	mailCtx, cancel := context.WithTimeout(ctx, externalResourceTimeout)
+	defer cancel()
+	if err := s.mail.SendOTP(mailCtx, email, otp); err != nil {
+		_ = s.cache.Del(ctx, otpCacheKey(email))
+		return response.RequestOTPResponse{}, err
+	}
+
+	return response.RequestOTPResponse{
+		ExpiresIn: otpExpiresInSeconds,
+	}, nil
+}
+
+func (s *authService) VerifyOTP(ctx context.Context, input VerifyOTPInput) (response.VerifyOTPResponse, error) {
+	email := normalizeEmail(input.Email)
+	otp := strings.TrimSpace(input.OTP)
+	if email == "" {
+		return response.VerifyOTPResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
+	}
+	if !isOTP(otp) {
+		return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidOTP.Error(), "otp must be a 6 digit number")
+	}
+
+	storedOTP, err := s.cache.Get(ctx, otpCacheKey(email))
+	if err != nil {
+		if cache.IsMiss(err) {
+			return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidOTP.Error(), "otp is invalid or expired")
+		}
+		return response.VerifyOTPResponse{}, response.InternalServerError("failed to validate otp")
+	}
+	if storedOTP != otp {
+		return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidOTP.Error(), "otp is invalid or expired")
+	}
+
+	user, err := s.authRepo.GetByEmail(ctx, email)
+	if err != nil {
+		if errors.Is(err, ErrUserNotFound) {
+			return response.VerifyOTPResponse{}, response.BadRequestError(ErrUserNotFound.Error(), "user not found")
+		}
+		return response.VerifyOTPResponse{}, response.InternalServerError(err.Error())
+	}
+
+	_ = s.cache.Del(ctx, otpCacheKey(email))
+
+	accessToken, err := s.tokenManager.GenerateAccessToken(user.ID)
+	if err != nil {
+		return response.VerifyOTPResponse{}, response.InternalServerError(err.Error())
+	}
+
+	userSession, err := s.tokenManager.GenerateUserSession(input.IPAddress, input.UserAgent, input.Device)
+	if err != nil {
+		return response.VerifyOTPResponse{}, response.InternalServerError(err.Error())
+	}
+
+	if err := s.authRepo.CreateSession(ctx, user.ID, userSession); err != nil {
+		return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid create session")
+	}
+
+	return response.VerifyOTPResponse{
+		Email:      email,
+		IsVerified: true,
+		Token: response.TokenResponse{
+			AccessToken:  accessToken,
+			RefreshToken: userSession.RefreshToken,
+		},
+	}, nil
 }
 
 func (s *authService) Logout(ctx context.Context, userID int64, token string) {
@@ -86,44 +184,25 @@ func (s *authService) Logout(ctx context.Context, userID int64, token string) {
 	_ = s.authRepo.RevokeSession(ctx, userID, tokenHash)
 }
 
-func (s *authService) Login(ctx context.Context, loginInput LoginInput) (response.LoginResponse, error) {
+func (s *authService) Login(ctx context.Context, loginInput LoginInput) (bool, error) {
 	email := normalizeEmail(loginInput.Email)
 	if email == "" {
-		return response.LoginResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
+		return false, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
 	}
 
 	user, err := s.authRepo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return response.LoginResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
+			return false, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
 		}
-		return response.LoginResponse{}, response.InternalServerError(err.Error())
+		return false, response.InternalServerError(err.Error())
 	}
 
 	if !internal.VerifyPassword([]byte(loginInput.Verifier), []byte(user.AuthVerifier)) {
-		return response.LoginResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
+		return false, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
 	}
 
-	accessToken, err := s.tokenManager.GenerateAccessToken(user.ID)
-	if err != nil {
-		return response.LoginResponse{}, response.InternalServerError(err.Error())
-	}
-
-	userSession, err := s.tokenManager.GenerateUserSession(loginInput.IPAddress, loginInput.UserAgent, loginInput.Device)
-	if err != nil {
-		return response.LoginResponse{}, response.InternalServerError(err.Error())
-	}
-
-	if err := s.authRepo.CreateSession(ctx, user.ID, userSession); err != nil {
-		return response.LoginResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid create session")
-	}
-
-	return response.LoginResponse{
-		Token: response.TokenResponse{
-			AccessToken:  accessToken,
-			RefreshToken: userSession.RefreshToken,
-		},
-	}, nil
+	return true, nil
 }
 
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (response.TokenResponse, error) {
@@ -295,27 +374,33 @@ func (s *authService) Register(ctx context.Context, input RegisterInput) (*User,
 		EmailVerified:    true,
 	}
 
-	if err := s.authRepo.WithTransaction(ctx, func(repo AuthRepository) error {
-		if err := repo.CreateUser(ctx, user); err != nil {
-			return err
+	if err := s.txManager.WithinTransaction(ctx, func(tx *gorm.DB) error {
+		authRepo := s.authRepo.WithTx(tx)
+		vaultRepo := s.vaultRepo.WithTx(tx)
+
+		if err := authRepo.CreateUser(ctx, user); err != nil {
+			return ErrFailedRegister
 		}
 
-		if err := s.vaultService.CreateArgonConfig(ctx, user.ID); err != nil {
-			return err
+		argonConfig := vault.NewDefaultArgonConfig(s.idGen.NewID())
+		if err := vaultRepo.CreateArgonConfig(ctx, argonConfig, user.ID); err != nil {
+			return ErrFailedRegister
 		}
 
-		if err := s.vaultService.CreateVault(ctx, user.ID, input.VaultKeySalt); err != nil {
-			return err
+		vaultData := vault.NewDefaultVault(s.idGen.NewID(), input.VaultKeySalt)
+		if err := vaultRepo.CreateVault(ctx, vaultData, user.ID); err != nil {
+			return ErrFailedRegister
 		}
 
 		return nil
 	}); err != nil {
-		return nil, response.BadRequestError(ErrFailedRegister.Error(), "failed to register")
+		if errors.Is(err, ErrFailedRegister) {
+			return nil, response.BadRequestError(ErrFailedRegister.Error(), "failed to register")
+		}
+		return nil, response.InternalServerError(err.Error())
 	}
 
-	if err := s.cache.Del(ctx, s.tokenManager.RegisterSessionKey(input.Session)); err != nil {
-		return nil, response.InternalServerError("failed to delete register session")
-	}
+	_ = s.cache.Del(ctx, s.tokenManager.RegisterSessionKey(input.Session))
 
 	return &user, nil
 }
@@ -375,4 +460,31 @@ func isBase64(value string) bool {
 	}
 
 	return false
+}
+
+func generateOTP() (string, error) {
+	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%0*d", otpDigits, n.Int64()), nil
+}
+
+func otpCacheKey(email string) string {
+	return fmt.Sprintf("auth_otp:%s", email)
+}
+
+func isOTP(value string) bool {
+	if len(value) != otpDigits {
+		return false
+	}
+
+	for _, r := range value {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+
+	return true
 }

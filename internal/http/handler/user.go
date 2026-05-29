@@ -13,8 +13,10 @@ type UserHandler struct {
 	userService user.UserService
 }
 
-func NewUserHandler() *UserHandler {
-	return &UserHandler{}
+func NewUserHandler(userService user.UserService) *UserHandler {
+	return &UserHandler{
+		userService: userService,
+	}
 }
 
 func (h *UserHandler) GetUser(c *gin.Context) {
