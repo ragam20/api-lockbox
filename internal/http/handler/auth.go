@@ -216,8 +216,9 @@ func (h *AuthHandler) Register(c *gin.Context) {
 
 func (h *AuthHandler) setAuthCookies(c *gin.Context, token response.TokenResponse) {
 	expiredAt := time.Now().Add(h.jwtCfg.Expired)
+	refreshExpAt := time.Now().Add(h.jwtCfg.RefreshExp)
 	http.SetCookie(c.Writer, h.cookieManager.SetAccessToken(token.AccessToken, expiredAt))
-	http.SetCookie(c.Writer, h.cookieManager.SetRefreshToken(token.RefreshToken, expiredAt))
+	http.SetCookie(c.Writer, h.cookieManager.SetRefreshToken(token.RefreshToken, refreshExpAt))
 }
 
 func loginDevice(userAgentHeader string) string {

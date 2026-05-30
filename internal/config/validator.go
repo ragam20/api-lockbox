@@ -63,6 +63,10 @@ func validateJWTConfig(cfg JWTConfig, errs *[]string) {
 	if cfg.Expired <= 0 {
 		*errs = append(*errs, "jwt.expired must be > 0")
 	}
+
+	if cfg.RefreshExp <= 0 {
+		*errs = append(*errs, "jwt.refresh_exp must be > 0")
+	}
 }
 
 func validateDatabaseConfig(cfg DatabaseConfig, errs *[]string) {

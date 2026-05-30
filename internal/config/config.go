@@ -18,8 +18,9 @@ type DatabaseConfig struct {
 }
 
 type JWTConfig struct {
-	Secret  string        `mapstructure:"secret"`
-	Expired time.Duration `mapstructure:"expired"`
+	Secret     string        `mapstructure:"secret"`
+	Expired    time.Duration `mapstructure:"expired"`
+	RefreshExp time.Duration `mapstructure:"refresh_exp"`
 }
 
 type RedisConfig struct {

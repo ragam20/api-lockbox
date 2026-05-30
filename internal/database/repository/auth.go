@@ -62,10 +62,20 @@ func (r *authRepository) CreateUser(ctx context.Context, user auth.User) error {
 }
 
 func (r *authRepository) RevokeSession(ctx context.Context, userID int64, tokenHash string) error {
-	return r.DB(ctx).Where("refresh_token_hash = ? AND user_id = ?", tokenHash, userID).
+	result := r.DB(ctx).Model(&entity.UserSessionEntity{}).Where("refresh_token_hash = ? AND user_id = ?", tokenHash, userID).
 		Updates(map[string]any{
 			"revoke_at": time.Now(),
-		}).Error
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return auth.ErrTokenNotFound
+	}
+
+	return nil
 }
 
 func (r *authRepository) CreateSession(ctx context.Context, userID int64, userSession auth.UserSession) error {
