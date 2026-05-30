@@ -7,6 +7,8 @@ import (
 	"lockbox/internal/constant"
 	"lockbox/internal/http/response"
 
+	apphttp "lockbox/internal/http"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,7 +22,7 @@ func NewVerifyJWTMiddleware(jm auth.TokenManager) *VerifyJWTMiddleware {
 
 func (m *VerifyJWTMiddleware) Handle() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token, _ := c.Cookie("authSession")
+		token, _ := c.Cookie(apphttp.AccessTokenCookieName())
 
 		if token == "" {
 			token = getTokenFromHeader(c)

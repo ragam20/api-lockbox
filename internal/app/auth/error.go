@@ -11,6 +11,7 @@ var (
 	ErrInvalidOTP         = errors.New("AUTH_INVALID_OTP")
 	ErrUnauthorized       = errors.New("AUTH_UNAUTHORIZED")
 	ErrTokenExpired       = errors.New("AUTH_TOKEN_EXPIRED")
+	ErrTokenNotFound      = errors.New("AUTH_TOKEN_NOT_FOUND")
 	ErrInvalidToken       = errors.New("AUTH_INVALID_TOKEN")
 	ErrSessionRequired    = errors.New("AUTH_SESSION_REQUIRED")
 	ErrSessionExpired     = errors.New("AUTH_SESSION_EXPIRED")

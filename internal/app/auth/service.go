@@ -181,7 +181,11 @@ func (s *authService) Logout(ctx context.Context, userID int64, token string) {
 	}
 
 	tokenHash := internal.HashString(token)
-	_ = s.authRepo.RevokeSession(ctx, userID, tokenHash)
+	if err := s.authRepo.RevokeSession(ctx, userID, tokenHash); err != nil {
+		if errors.Is(err, ErrTokenNotFound) {
+			return
+		}
+	}
 }
 
 func (s *authService) Login(ctx context.Context, loginInput LoginInput) (bool, error) {
@@ -215,8 +219,8 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 		return response.TokenResponse{}, response.Unauthorized()
 	}
 
-	refreshTokenHash := internal.HashString(refreshToken)
-	session, err := s.authRepo.GetSessionByRefreshTokenHash(ctx, refreshTokenHash)
+	oldRefreshTokenHash := internal.HashString(refreshToken)
+	session, err := s.authRepo.GetSessionByRefreshTokenHash(ctx, oldRefreshTokenHash)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.TokenResponse{}, response.Unauthorized()
@@ -230,6 +234,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 
 	now := time.Now().UTC()
 	if !session.ExpiresAt.IsZero() && now.After(session.ExpiresAt) {
+		fmt.Printf("Expired at %v", session.ExpiresAt)
 		return response.TokenResponse{}, response.Unauthorized()
 	}
 
@@ -244,9 +249,9 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 	}
 
 	newRefreshTokenHash := internal.HashString(newRefreshToken)
-	expiresAt := now.Add(s.jwtCfg.Expired)
+	expiresAt := now.Add(s.jwtCfg.RefreshExp)
 
-	if err := s.authRepo.UpdateRefreshToken(ctx, session.ID, refreshTokenHash, newRefreshTokenHash, expiresAt, now); err != nil {
+	if err := s.authRepo.UpdateRefreshToken(ctx, session.ID, oldRefreshTokenHash, newRefreshTokenHash, expiresAt, now); err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return response.TokenResponse{}, response.Unauthorized()
 		}

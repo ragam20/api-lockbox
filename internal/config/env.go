@@ -77,6 +77,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.request_timeout", 5*time.Second)
 	v.SetDefault("app.allowed_origins", []string{"http://localhost:5173"})
 	v.SetDefault("app.frontend_url", "http://localhost:5173")
+	v.SetDefault("jwt.refresh_exp", 168*time.Hour)
 }
 
 func isProduction(appEnv string) bool {
@@ -105,6 +106,7 @@ func getKeys() []string {
 
 		"jwt.secret",
 		"jwt.expired",
+		"jwt.refresh_exp",
 
 		"db.url",
 
