@@ -27,6 +27,7 @@ type VaultItemType string
 const (
 	VaultItemTypePassword VaultItemType = "password"
 	VaultItemTypeNote     VaultItemType = "note"
+	VaultItemTypeAll      VaultItemType = "all"
 )
 
 type VaultItem struct {
@@ -148,5 +149,5 @@ func (f *VaultItemQuery) ParseOrder() (string, string) {
 }
 
 func CheckVaultType(vaultType string) bool {
-	return vaultType == string(VaultItemTypeNote) || vaultType == string(VaultItemTypePassword)
+	return vaultType == string(VaultItemTypeNote) || vaultType == string(VaultItemTypePassword) || vaultType == string(VaultItemTypeAll)
 }

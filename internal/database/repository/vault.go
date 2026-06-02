@@ -115,7 +115,11 @@ func (r *vaultRepository) GetVaultItem(ctx context.Context, input vault.GetVault
 
 	db := r.DB(ctx).
 		Joins("JOIN vaults ON vaults.id = vault_items.vault_id").
-		Where("vaults.user_id = ? AND vault_items.item_type = ? AND vault_items.deleted_at IS NULL AND "+archivedClause, input.UserID, input.VaultType)
+		Where("vaults.user_id = ? AND vault_items.deleted_at IS NULL AND "+archivedClause, input.UserID)
+
+	if input.VaultType != "all" {
+		db = db.Where("vault_items.item_type = ?", input.VaultType)
+	}
 
 	if search := strings.TrimSpace(input.Query.Search); search != "" {
 		db = db.Where("vault_items.title ILIKE ?", "%"+search+"%")
