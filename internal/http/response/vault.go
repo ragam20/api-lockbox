@@ -29,6 +29,7 @@ type VaultItemResponse struct {
 	Ciphertext      string     `json:"ciphertext"`
 	IvProtectionKey string     `json:"ivProtectionKey"`
 	ProtectionKey   string     `json:"protectionKey"`
+	FavoriteAt      *time.Time `json:"favoriteAt"`
 	ArchivedAt      *time.Time `json:"archivedAt"`
 	CreatedAt       time.Time  `json:"createdAt"`
 	UpdatedAt       time.Time  `json:"updatedAt"`

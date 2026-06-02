@@ -34,6 +34,7 @@ type VaultItemEntity struct {
 	IvProtectionKey string `gorm:"type:text;not null"`
 	ProtectionKey   string `gorm:"type:text;not null"`
 
+	FavoriteAt *time.Time
 	ArchivedAt *time.Time
 
 	DeletedAt *time.Time
@@ -57,6 +58,7 @@ func (e VaultItemEntity) ToDomain() vault.VaultItem {
 		Ciphertext:      e.Ciphertext,
 		IvProtectionKey: e.IvProtectionKey,
 		ProtectionKey:   e.ProtectionKey,
+		FavoriteAt:      e.FavoriteAt,
 		ArchivedAt:      e.ArchivedAt,
 		CreatedAt:       e.CreatedAt,
 		UpdatedAt:       e.UpdatedAt,

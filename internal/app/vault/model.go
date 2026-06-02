@@ -39,6 +39,7 @@ type VaultItem struct {
 	Ciphertext      string
 	IvProtectionKey string
 	ProtectionKey   string
+	FavoriteAt      *time.Time
 	ArchivedAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

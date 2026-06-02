@@ -99,10 +99,10 @@ func TestCreateArgonConfigUsesDefaults(t *testing.T) {
 	}
 }
 
-func TestGetVaultItemRejectsInvalidType(t *testing.T) {
+func TestGetVaultItemsRejectsInvalidType(t *testing.T) {
 	service := &vaultService{vaultRepo: &mockVaultRepo{}}
 
-	_, err := service.GetVaultItem(context.Background(), GetVaultInput{
+	_, err := service.GetVaultItems(context.Background(), GetVaultInput{
 		UserID:    7,
 		VaultType: "invalid",
 	})
@@ -116,16 +116,16 @@ func TestGetVaultItemRejectsInvalidType(t *testing.T) {
 	}
 }
 
-func TestGetVaultItemTrimsSearchAndReturnsResult(t *testing.T) {
+func TestGetVaultItemsTrimsSearchAndReturnsResult(t *testing.T) {
 	repo := &mockVaultRepo{
-		getVaultItemResult: GetVaultItemsResult{
+		getVaultItemsResult: GetVaultItemsResult{
 			Items:      []VaultItem{{ID: 1, Title: "First"}},
 			TotalItems: 1,
 		},
 	}
 	service := &vaultService{vaultRepo: repo}
 
-	result, err := service.GetVaultItem(context.Background(), GetVaultInput{
+	result, err := service.GetVaultItems(context.Background(), GetVaultInput{
 		UserID:    7,
 		VaultType: string(VaultItemTypePassword),
 		Query: VaultItemQuery{
@@ -138,14 +138,47 @@ func TestGetVaultItemTrimsSearchAndReturnsResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected vault items lookup to succeed: %v", err)
 	}
-	if repo.getVaultItemInput.Query.Search != "hello" {
-		t.Fatalf("expected search to be trimmed, got %q", repo.getVaultItemInput.Query.Search)
+	if repo.getVaultItemsInput.Query.Search != "hello" {
+		t.Fatalf("expected search to be trimmed, got %q", repo.getVaultItemsInput.Query.Search)
 	}
-	if repo.getVaultItemInput.Query.Page != 2 || repo.getVaultItemInput.Query.Limit != 5 {
-		t.Fatalf("unexpected pagination input: %+v", repo.getVaultItemInput.Query)
+	if repo.getVaultItemsInput.Query.Page != 2 || repo.getVaultItemsInput.Query.Limit != 5 {
+		t.Fatalf("unexpected pagination input: %+v", repo.getVaultItemsInput.Query)
 	}
 	if result.TotalItems != 1 || len(result.Items) != 1 || result.Items[0].Title != "First" {
 		t.Fatalf("unexpected vault items result: %+v", result)
+	}
+}
+
+func TestGetFavoritesTrimsSearchAndReturnsResult(t *testing.T) {
+	repo := &mockVaultRepo{
+		getFavoritesResult: GetVaultItemsResult{
+			Items:      []VaultItem{{ID: 2, Title: "Favorite"}},
+			TotalItems: 1,
+		},
+	}
+	service := &vaultService{vaultRepo: repo}
+
+	result, err := service.GetFavorites(context.Background(), GetVaultInput{
+		UserID:    7,
+		VaultType: string(VaultItemTypeAll),
+		Query: VaultItemQuery{
+			Page:   1,
+			Limit:  10,
+			SortBy: "created_at,desc",
+			Search: "  world  ",
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected favorite vault items lookup to succeed: %v", err)
+	}
+	if repo.getFavoritesInput.Query.Search != "world" {
+		t.Fatalf("expected search to be trimmed, got %q", repo.getFavoritesInput.Query.Search)
+	}
+	if repo.getFavoritesInput.Query.Page != 1 || repo.getFavoritesInput.Query.Limit != 10 {
+		t.Fatalf("unexpected pagination input: %+v", repo.getFavoritesInput.Query)
+	}
+	if result.TotalItems != 1 || len(result.Items) != 1 || result.Items[0].Title != "Favorite" {
+		t.Fatalf("unexpected favorite vault items result: %+v", result)
 	}
 }
 
@@ -302,6 +335,14 @@ type mockVaultRepo struct {
 	getArgonConfigErr    error
 	getArgonConfigUserID int64
 
+	setFavoriteUserID int64
+	setFavoriteItemID int64
+	setFavoriteErr    error
+
+	deleteFavoriteUserID int64
+	deleteFavoriteItemID int64
+	deleteFavoriteErr    error
+
 	createVaultArg    Vault
 	createVaultUserID int64
 	createVaultErr    error
@@ -314,9 +355,13 @@ type mockVaultRepo struct {
 	getVaultByUserIDErr    error
 	getVaultByUserIDUserID int64
 
-	getVaultItemInput  GetVaultInput
-	getVaultItemResult GetVaultItemsResult
-	getVaultItemErr    error
+	getVaultItemsInput  GetVaultInput
+	getVaultItemsResult GetVaultItemsResult
+	getVaultItemsErr    error
+
+	getFavoritesInput  GetVaultInput
+	getFavoritesResult GetVaultItemsResult
+	getFavoritesErr    error
 
 	createVaultItemArg VaultItem
 	createVaultItemErr error
@@ -346,6 +391,16 @@ type mockVaultRepo struct {
 
 func (r *mockVaultRepo) WithTx(tx *gorm.DB) VaultRepository {
 	return r
+}
+
+func (r *mockVaultRepo) SetFavorite(ctx context.Context, itemID int64) error {
+	r.setFavoriteItemID = itemID
+	return r.setFavoriteErr
+}
+
+func (r *mockVaultRepo) DeleteFavorite(ctx context.Context, itemID int64) error {
+	r.deleteFavoriteItemID = itemID
+	return r.deleteFavoriteErr
 }
 
 func (r *mockVaultRepo) GetVault(ctx context.Context, userID int64) (Vault, error) {
@@ -380,9 +435,14 @@ func (r *mockVaultRepo) GetVaultByUserID(ctx context.Context, userID int64) (Vau
 	return r.getVaultByUserIDResult, r.getVaultByUserIDErr
 }
 
-func (r *mockVaultRepo) GetVaultItem(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error) {
-	r.getVaultItemInput = input
-	return r.getVaultItemResult, r.getVaultItemErr
+func (r *mockVaultRepo) GetVaultItems(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error) {
+	r.getVaultItemsInput = input
+	return r.getVaultItemsResult, r.getVaultItemsErr
+}
+
+func (r *mockVaultRepo) GetFavorites(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error) {
+	r.getFavoritesInput = input
+	return r.getFavoritesResult, r.getFavoritesErr
 }
 
 func (r *mockVaultRepo) CreateVaultItem(ctx context.Context, item VaultItem) error {

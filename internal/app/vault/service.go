@@ -24,11 +24,14 @@ const (
 
 type (
 	VaultService interface {
+		SetFavorite(ctx context.Context, itemID int64) error
+		DeleteFavorite(ctx context.Context, itemID int64) error
 		GetVault(ctx context.Context, userID int64) (Vault, error)
 		GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error)
 		CreateVault(ctx context.Context, userID int64, vaultKeySalt string) error
 		CreateArgonConfig(ctx context.Context, userID int64) error
-		GetVaultItem(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error)
+		GetVaultItems(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error)
+		GetFavorites(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error)
 		GetVaultItemByID(ctx context.Context, input GetVaultItemByIDInput) (VaultItem, error)
 		CreateVaultItem(ctx context.Context, input CreateVaultItemInput) (VaultItem, error)
 		UpdateVaultItem(ctx context.Context, input UpdateVaultItemInput) (VaultItem, error)
@@ -48,6 +51,36 @@ func NewVaultService(vaultRepo VaultRepository, idGen idgen.IDGenerator) VaultSe
 		vaultRepo: vaultRepo,
 		idGen:     idGen,
 	}
+}
+
+func (s *vaultService) SetFavorite(ctx context.Context, itemID int64) error {
+	if itemID <= 0 {
+		return response.BadRequestError(ErrRequiredID.Error(), "item id is required")
+	}
+
+	if err := s.vaultRepo.SetFavorite(ctx, itemID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return response.BadRequestError(ErrNotFound.Error(), "vault not found")
+		}
+		return response.InternalServerError(err.Error())
+	}
+
+	return nil
+}
+
+func (s *vaultService) DeleteFavorite(ctx context.Context, itemID int64) error {
+	if itemID <= 0 {
+		return response.BadRequestError(ErrRequiredID.Error(), "item id is required")
+	}
+
+	if err := s.vaultRepo.DeleteFavorite(ctx, itemID); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return response.BadRequestError(ErrNotFound.Error(), "vault not found")
+		}
+		return response.InternalServerError(err.Error())
+	}
+
+	return nil
 }
 
 func (s *vaultService) GetVault(ctx context.Context, userID int64) (Vault, error) {
@@ -94,18 +127,13 @@ func (s *vaultService) CreateArgonConfig(ctx context.Context, userID int64) erro
 	return nil
 }
 
-func (s *vaultService) GetVaultItem(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error) {
-	if input.UserID == 0 {
-		return GetVaultItemsResult{}, response.Unauthorized()
+func (s *vaultService) GetVaultItems(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error) {
+	input, err := prepareVaultItemsInput(input)
+	if err != nil {
+		return GetVaultItemsResult{}, err
 	}
 
-	if !CheckVaultType(input.VaultType) {
-		return GetVaultItemsResult{}, response.BadRequestError(ErrVaultType.Error(), "vault type must be password or note")
-	}
-
-	input.Query.Search = strings.TrimSpace(input.Query.Search)
-
-	result, err := s.vaultRepo.GetVaultItem(ctx, input)
+	result, err := s.vaultRepo.GetVaultItems(ctx, input)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return GetVaultItemsResult{}, response.NotFoundError(ErrNotFound.Error(), "vault not found")
@@ -114,6 +142,37 @@ func (s *vaultService) GetVaultItem(ctx context.Context, input GetVaultInput) (G
 	}
 
 	return result, nil
+}
+
+func (s *vaultService) GetFavorites(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error) {
+	input, err := prepareVaultItemsInput(input)
+	if err != nil {
+		return GetVaultItemsResult{}, err
+	}
+
+	result, err := s.vaultRepo.GetFavorites(ctx, input)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return GetVaultItemsResult{}, response.NotFoundError(ErrNotFound.Error(), "vault not found")
+		}
+		return GetVaultItemsResult{}, response.InternalServerError("failed to get favorite vault items")
+	}
+
+	return result, nil
+}
+
+func prepareVaultItemsInput(input GetVaultInput) (GetVaultInput, error) {
+	if input.UserID == 0 {
+		return GetVaultInput{}, response.Unauthorized()
+	}
+
+	if !CheckVaultType(input.VaultType) {
+		return GetVaultInput{}, response.BadRequestError(ErrVaultType.Error(), "vault type must be password or note")
+	}
+
+	input.Query.Search = strings.TrimSpace(input.Query.Search)
+
+	return input, nil
 }
 
 func (s *vaultService) GetVaultItemByID(ctx context.Context, input GetVaultItemByIDInput) (VaultItem, error) {

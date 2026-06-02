@@ -50,13 +50,16 @@ func NewRoutes(
 	{
 		vaultAPI.GET("", vaultHandler.GetVault)
 		vaultAPI.POST("/items", vaultHandler.CreateVaultItem)
-		vaultAPI.GET("/items", vaultHandler.GetVaultItem)
+		vaultAPI.GET("/items", vaultHandler.GetVaultItems)
+		vaultAPI.GET("/items/favorites", vaultHandler.GetFavorites)
 		vaultAPI.GET("/items/:id", vaultHandler.GetVaultItemByID)
 		vaultAPI.PUT("/items/:id", vaultHandler.UpdateVaultItem)
 		vaultAPI.POST("/items/:id/archive", vaultHandler.ArchiveVaultItem)
 		vaultAPI.POST("/items/:id/unarchive", vaultHandler.UnarchiveVaultItem)
 		vaultAPI.DELETE("/items/:id", vaultHandler.DeleteVaultItem)
 		vaultAPI.GET("/argon-config", vaultHandler.GetArgonConfig)
+		vaultAPI.PUT("/items/:id/favorite", vaultHandler.SetFavorite)
+		vaultAPI.DELETE("/items/:id/favorite", vaultHandler.DeleteFavorite)
 	}
 
 	userAPI := api.Group("/user",

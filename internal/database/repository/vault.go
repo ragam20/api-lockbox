@@ -25,6 +25,46 @@ func (r *vaultRepository) WithTx(tx *gorm.DB) vault.VaultRepository {
 	return &vaultRepository{BaseRepository: BaseRepository{tx}}
 }
 
+func (r *vaultRepository) SetFavorite(ctx context.Context, itemID int64) error {
+	result := r.DB(ctx).Model(&entity.VaultItemEntity{}).
+		Where("id = ?", itemID).
+		Update("favorite_at", time.Now())
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return vault.ErrNotFound
+		}
+
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return vault.ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *vaultRepository) DeleteFavorite(ctx context.Context, itemID int64) error {
+	result := r.DB(ctx).Model(&entity.VaultItemEntity{}).
+		Where("id = ?", itemID).
+		Update("favorite_at", nil)
+
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return vault.ErrNotFound
+		}
+
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return vault.ErrNotFound
+	}
+
+	return nil
+}
+
 func (r *vaultRepository) GetVault(ctx context.Context, userID int64) (vault.Vault, error) {
 	var e entity.VaultEntity
 	if err := r.DB(ctx).Where("user_id = ?", userID).First(&e).Error; err != nil {
@@ -105,7 +145,15 @@ func (r *vaultRepository) CreateVault(ctx context.Context, vault vault.Vault, us
 	return r.DB(ctx).Create(&vaultEntity).Error
 }
 
-func (r *vaultRepository) GetVaultItem(ctx context.Context, input vault.GetVaultInput) (vault.GetVaultItemsResult, error) {
+func (r *vaultRepository) GetVaultItems(ctx context.Context, input vault.GetVaultInput) (vault.GetVaultItemsResult, error) {
+	return r.listVaultItems(ctx, input, false)
+}
+
+func (r *vaultRepository) GetFavorites(ctx context.Context, input vault.GetVaultInput) (vault.GetVaultItemsResult, error) {
+	return r.listVaultItems(ctx, input, true)
+}
+
+func (r *vaultRepository) listVaultItems(ctx context.Context, input vault.GetVaultInput, favoritesOnly bool) (vault.GetVaultItemsResult, error) {
 	var e []entity.VaultItemEntity
 
 	archivedClause := "vault_items.archived_at IS NULL"
@@ -116,6 +164,10 @@ func (r *vaultRepository) GetVaultItem(ctx context.Context, input vault.GetVault
 	db := r.DB(ctx).
 		Joins("JOIN vaults ON vaults.id = vault_items.vault_id").
 		Where("vaults.user_id = ? AND vault_items.deleted_at IS NULL AND "+archivedClause, input.UserID)
+
+	if favoritesOnly {
+		db = db.Where("vault_items.favorite_at IS NOT NULL")
+	}
 
 	if input.VaultType != "all" {
 		db = db.Where("vault_items.item_type = ?", input.VaultType)

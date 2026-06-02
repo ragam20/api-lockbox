@@ -20,6 +20,48 @@ func NewVaultHandler(vaultService vault.VaultService) *VaultHandler {
 	return &VaultHandler{vaultService: vaultService}
 }
 
+func (h *VaultHandler) SetFavorite(c *gin.Context) {
+	_, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	itemID, err := vaultItemIDFromParam(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.vaultService.SetFavorite(c.Request.Context(), itemID); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success set favorite", true)
+}
+
+func (h *VaultHandler) DeleteFavorite(c *gin.Context) {
+	_, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	itemID, err := vaultItemIDFromParam(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	if err := h.vaultService.DeleteFavorite(c.Request.Context(), itemID); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success delete favorite", true)
+}
+
 func (h *VaultHandler) GetVault(c *gin.Context) {
 	userID, err := userIDFromContext(c)
 	if err != nil {
@@ -66,7 +108,7 @@ func (h *VaultHandler) GetArgonConfig(c *gin.Context) {
 	})
 }
 
-func (h *VaultHandler) GetVaultItem(c *gin.Context) {
+func (h *VaultHandler) GetVaultItems(c *gin.Context) {
 	userID, err := userIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
@@ -90,8 +132,7 @@ func (h *VaultHandler) GetVaultItem(c *gin.Context) {
 		_ = c.Error(err)
 		return
 	}
-
-	resp, err := h.vaultService.GetVaultItem(c.Request.Context(), vault.GetVaultInput{
+	resp, err := h.vaultService.GetVaultItems(c.Request.Context(), vault.GetVaultInput{
 		Query: vault.VaultItemQuery{
 			Page:   pagination.Page,
 			Limit:  pagination.Limit,
@@ -117,6 +158,70 @@ func (h *VaultHandler) GetVaultItem(c *gin.Context) {
 		c,
 		http.StatusOK,
 		"success get vault items",
+		vaultItemsResponse(resp.Items),
+		response.Meta{
+			"page":       pagination.Page,
+			"limit":      pagination.Limit,
+			"totalItems": resp.TotalItems,
+			"totalPages": totalPages,
+		},
+	)
+}
+
+func (h *VaultHandler) GetFavorites(c *gin.Context) {
+	userID, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	pagination, err := GetPagination(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	vaultType := c.Query("type")
+	if vaultType == "" {
+		vaultType = string(vault.VaultItemTypeAll)
+	}
+	if !vault.CheckVaultType(vaultType) {
+		_ = c.Error(response.BadRequestError(vault.ErrVaultType.Error(), "vault type must be password or note"))
+		return
+	}
+
+	archive, err := archiveQuery(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	resp, err := h.vaultService.GetFavorites(c.Request.Context(), vault.GetVaultInput{
+		Query: vault.VaultItemQuery{
+			Page:   pagination.Page,
+			Limit:  pagination.Limit,
+			SortBy: c.Query("sortBy"),
+			Search: c.Query("search"),
+		},
+		VaultType: vaultType,
+		UserID:    userID,
+		Archived:  archive,
+	})
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	limit := pagination.Limit
+	totalPages := int64(0)
+	if limit > 0 {
+		totalPages = (resp.TotalItems + int64(limit) - 1) / int64(limit)
+	}
+
+	response.SuccessWithMeta(
+		c,
+		http.StatusOK,
+		"success get favorite vault items",
 		vaultItemsResponse(resp.Items),
 		response.Meta{
 			"page":       pagination.Page,
@@ -310,6 +415,7 @@ func vaultItemResponse(item vault.VaultItem) response.VaultItemResponse {
 		Ciphertext:      item.Ciphertext,
 		IvProtectionKey: item.IvProtectionKey,
 		ProtectionKey:   item.ProtectionKey,
+		FavoriteAt:      item.FavoriteAt,
 		ArchivedAt:      item.ArchivedAt,
 		CreatedAt:       item.CreatedAt,
 		UpdatedAt:       item.UpdatedAt,

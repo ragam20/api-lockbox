@@ -73,6 +73,20 @@ func archiveQuery(c *gin.Context) (bool, error) {
 	return archive, nil
 }
 
+func favoriteQuery(c *gin.Context) (bool, error) {
+	isFavoriteQ := c.Query("favorite")
+	if isFavoriteQ == "" {
+		return false, nil
+	}
+
+	isFavorite, err := strconv.ParseBool(isFavoriteQ)
+	if err != nil {
+		return false, response.BadRequestError(apphttp.ErrTransport.Error(), "favorite must be a boolean")
+	}
+
+	return isFavorite, nil
+}
+
 func userIDFromContext(c *gin.Context) (int64, error) {
 	value, exists := c.Get(constant.UserIDCtx)
 	if !exists {
