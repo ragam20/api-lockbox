@@ -77,7 +77,9 @@ func TestGetUserMapsInternalError(t *testing.T) {
 type mockUserRepo struct {
 	user             User
 	err              error
+	updateErr        error
 	calledWithUserID int64
+	updatedUser      User
 }
 
 func (r *mockUserRepo) GetUser(ctx context.Context, userID int64) (User, error) {
@@ -86,6 +88,14 @@ func (r *mockUserRepo) GetUser(ctx context.Context, userID int64) (User, error) 
 		return User{}, r.err
 	}
 	return r.user, nil
+}
+
+func (r *mockUserRepo) UpdateProfile(ctx context.Context, user User) error {
+	r.updatedUser = user
+	if r.updateErr != nil {
+		return r.updateErr
+	}
+	return nil
 }
 
 func mustUserAppErr(t *testing.T, err error) *appResponse.AppErrResponse {
