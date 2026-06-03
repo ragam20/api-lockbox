@@ -67,6 +67,7 @@ func NewRoutes(
 		verifyJWT.Handle())
 	{
 		userAPI.GET("", userHandler.GetUser)
+		userAPI.PUT("", userHandler.UpdateProfile)
 	}
 
 	g.NoRoute(func(c *gin.Context) {

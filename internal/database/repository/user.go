@@ -18,6 +18,20 @@ func NewUserRepository(db *gorm.DB) user.UserRepository {
 	return &userRepository{BaseRepository: NewBaseRepository(db)}
 }
 
+func (r *userRepository) UpdateProfile(ctx context.Context, usr user.User) error {
+	result := r.DB(ctx).Model(usr).Updates(usr)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return user.ErrUserNotFound
+	}
+
+	return nil
+}
+
 func (r *userRepository) GetUser(ctx context.Context, userID int64) (user.User, error) {
 	var e entity.UserEntity
 	if err := r.DB(ctx).Where("id = ?", userID).First(&e).Error; err != nil {
