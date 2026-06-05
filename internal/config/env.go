@@ -12,11 +12,12 @@ import (
 )
 
 type Env struct {
-	App         AppConfig      `mapstructure:"app"`
-	Database    DatabaseConfig `mapstructure:"db"`
-	JWTConfig   JWTConfig      `mapstructure:"jwt"`
-	RedisConfig RedisConfig    `mapstructure:"redis"`
-	SMTPConfig  SMTPConfig     `mapstructure:"smtp"`
+	App           AppConfig      `mapstructure:"app"`
+	Database      DatabaseConfig `mapstructure:"db"`
+	JWTConfig     JWTConfig      `mapstructure:"jwt"`
+	RedisConfig   RedisConfig    `mapstructure:"redis"`
+	SMTPConfig    SMTPConfig     `mapstructure:"smtp"`
+	StorageConfig StorageConfig  `mapstructure:"storage"`
 }
 
 func NewEnv() (*Env, error) {
@@ -116,5 +117,9 @@ func getKeys() []string {
 		"smtp.host",
 		"smtp.user",
 		"smtp.pass",
+
+		"storage.cloudinary.cloud_name",
+		"storage.cloudinary.api_secret",
+		"storage.cloudinary.api_key",
 	}
 }

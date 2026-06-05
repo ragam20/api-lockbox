@@ -68,6 +68,9 @@ func NewRoutes(
 	{
 		userAPI.GET("", userHandler.GetUser)
 		userAPI.PUT("", userHandler.UpdateProfile)
+		userAPI.GET("/avatar/upload-permission", userHandler.UploadAvatarPermission)
+		userAPI.PATCH("/avatar", userHandler.SaveAvatarURL)
+		userAPI.DELETE("/avatar", userHandler.RemoveAvatar)
 	}
 
 	g.NoRoute(func(c *gin.Context) {

@@ -13,6 +13,16 @@ type AppConfig struct {
 	FrontendURL          string        `mapstructure:"frontend_url"`
 }
 
+type StorageConfig struct {
+	Cloudinary CloudinaryConfig `mapstructure:"cloudinary"`
+}
+
+type CloudinaryConfig struct {
+	CloudName string `mapstructure:"cloud_name"`
+	APIKey    string `mapstructure:"api_key"`
+	APISecret string `mapstructure:"api_secret"`
+}
+
 type DatabaseConfig struct {
 	URL string `mapstructure:"url"`
 }
@@ -35,20 +45,22 @@ type SMTPConfig struct {
 }
 
 type Config struct {
-	App         AppConfig
-	Database    DatabaseConfig
-	JWTConfig   JWTConfig
-	RedisConfig RedisConfig
-	SMTPConfig  SMTPConfig
+	App           AppConfig
+	Database      DatabaseConfig
+	JWTConfig     JWTConfig
+	RedisConfig   RedisConfig
+	SMTPConfig    SMTPConfig
+	StorageConfig StorageConfig
 }
 
 func NewConfig(env *Env) *Config {
 	return &Config{
-		App:         env.App,
-		Database:    env.Database,
-		JWTConfig:   env.JWTConfig,
-		RedisConfig: env.RedisConfig,
-		SMTPConfig:  env.SMTPConfig,
+		App:           env.App,
+		Database:      env.Database,
+		JWTConfig:     env.JWTConfig,
+		RedisConfig:   env.RedisConfig,
+		SMTPConfig:    env.SMTPConfig,
+		StorageConfig: env.StorageConfig,
 	}
 }
 
@@ -70,4 +82,12 @@ func NewRedisConfig(cfg *Config) *RedisConfig {
 
 func NewSMTPConfig(cfg *Config) *SMTPConfig {
 	return &cfg.SMTPConfig
+}
+
+func NewStorageConfig(cfg *Config) *StorageConfig {
+	return &cfg.StorageConfig
+}
+
+func NewCloudinaryConfig(cfg *Config) *CloudinaryConfig {
+	return &cfg.StorageConfig.Cloudinary
 }
