@@ -6,6 +6,7 @@ type User struct {
 	ID               int64
 	Email            string
 	Name             string
+	PublicImgID      *string
 	ImgURL           *string
 	MasterKeySalt    string
 	AuthVerifier     string

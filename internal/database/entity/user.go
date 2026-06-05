@@ -12,6 +12,7 @@ type UserEntity struct {
 	Name          string `gorm:"size:255;not null"`
 	Email         string `gorm:"size:255;not null;uniqueIndex"`
 	EmailVerified bool
+	PublicImgID   *string
 	ImgURL        *string
 
 	MasterKeySalt string `gorm:"type:text;not null"`
@@ -33,6 +34,7 @@ func (e UserEntity) ToDomainUser() auth.User {
 		Name:             e.Name,
 		Email:            e.Email,
 		EmailVerified:    e.EmailVerified,
+		PublicImgID:      e.PublicImgID,
 		ImgURL:           e.ImgURL,
 		MasterKeySalt:    e.MasterKeySalt,
 		AuthVerifier:     e.AuthVerifier,

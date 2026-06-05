@@ -21,6 +21,63 @@ func NewUserHandler(userService user.UserService) *UserHandler {
 	}
 }
 
+func (h *UserHandler) RemoveAvatar(c *gin.Context) {
+	userID, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(response.Unauthorized())
+		return
+	}
+
+	err = h.userService.RemoveAvatar(c.Request.Context(), userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success remove avatar", true)
+}
+
+func (h *UserHandler) SaveAvatarURL(c *gin.Context) {
+	id, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(response.Unauthorized())
+		return
+	}
+
+	var req request.SaveAvatarRequest
+	if err := c.ShouldBind(&req); err != nil {
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
+		return
+	}
+
+	if err := h.userService.SaveAvatarURL(c.Request.Context(), user.SaveAvatarURLInput{
+		UserID:      id,
+		PublicImgID: req.PublicImgID,
+		ImgURL:      req.ImgURL,
+	}); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success save url", true)
+}
+
+func (h *UserHandler) UploadAvatarPermission(c *gin.Context) {
+	id, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(response.Unauthorized())
+		return
+	}
+
+	resp, err := h.userService.UploadAvatarRequest(c.Request.Context(), id)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success upload avatar request", resp)
+}
+
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	id, err := userIDFromContext(c)
 	if err != nil {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"lockbox/internal/app/auth"
@@ -19,6 +20,7 @@ import (
 	"lockbox/internal/idgen"
 	"lockbox/internal/logger"
 	"lockbox/internal/smtp"
+	"lockbox/internal/storage/cloudinary"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
@@ -34,6 +36,8 @@ func main() {
 			config.NewRedisConfig,
 			config.NewSMTPConfig,
 			config.NewJWTConfig,
+			config.NewStorageConfig,
+			config.NewCloudinaryConfig,
 		),
 	)
 
@@ -43,6 +47,7 @@ func main() {
 			logger.NewLogger,
 			smtp.NewSMTPConfig,
 			smtp.NewMailService,
+			cloudinary.NewCloudinaryService,
 		),
 	)
 
@@ -112,6 +117,10 @@ func main() {
 			router.NewRoutes,
 		),
 	))
+
+	if err := app.Err(); err != nil {
+		log.Fatal(err)
+	}
 
 	app.Run()
 }
