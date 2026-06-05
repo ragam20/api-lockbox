@@ -21,11 +21,14 @@ type Env struct {
 }
 
 func NewEnv() (*Env, error) {
-	appEnv := os.Getenv("APP_ENV")
+	appEnv := normalizeAppEnv(getAppEnv())
+
 	configName := "development"
-	if appEnv != "" {
-		configName = appEnv
+	if isProduction(appEnv) {
+		configName = "production"
 	}
+
+	fmt.Println("NewEnv() -> " + configName)
 
 	v := viper.New()
 	v.SetConfigName(configName)
@@ -37,13 +40,12 @@ func NewEnv() (*Env, error) {
 
 	setDefaults(v)
 
-	if !isProduction(appEnv) {
-		if err := v.ReadInConfig(); err != nil {
-			var notFound viper.ConfigFileNotFoundError
-			if !errors.As(err, &notFound) {
-				return nil, fmt.Errorf("read config %q: %w", configName, err)
-			}
+	if err := v.ReadInConfig(); err != nil {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) {
+			return nil, fmt.Errorf("read config %q: %w", configName, err)
 		}
+		return nil, fmt.Errorf("read config %q: %w", configName, err)
 	}
 
 	if err := bindEnvs(v, getKeys()); err != nil {
@@ -67,6 +69,20 @@ func NewEnv() (*Env, error) {
 	fmt.Println(string(data))
 
 	return &env, nil
+}
+
+func getAppEnv() string {
+	for _, key := range []string{"APP_ENV", "ENV_APP", "env_app"} {
+		if value, ok := os.LookupEnv(key); ok {
+			return value
+		}
+	}
+
+	return ""
+}
+
+func normalizeAppEnv(appEnv string) string {
+	return strings.ToLower(strings.TrimSpace(appEnv))
 }
 
 func setDefaults(v *viper.Viper) {

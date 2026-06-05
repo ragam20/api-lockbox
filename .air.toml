@@ -2,12 +2,15 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-cmd = "go build -o ./tmp/api_lockbox ./cmd/api"
+cmd = " go build -o ./tmp/api_lockbox ./cmd/api"
 bin = "./tmp/api_lockbox"
 include_ext = ["go"]
 exclude_dir = ["vendor", "tmp", "migrations", "supabase"]
 delay = 200
 poll = true
+
+[env]
+APP_ENV = "dev"
 
 [color]
 # Customize each part's color. If no color found, use the raw app log.
