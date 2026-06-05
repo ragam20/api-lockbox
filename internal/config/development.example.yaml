@@ -19,3 +19,9 @@ db:
 
 redis:
   url:
+
+storage:
+  cloudinary:
+    cloud_name:
+    api_secret:
+    api_key:
