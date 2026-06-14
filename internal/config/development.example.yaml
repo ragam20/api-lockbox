@@ -1,12 +1,18 @@
 app:
-  env:
-  version:
-  log_level:
-  node_id:
-  port:
-  frontend_url:
+  env: development
+  version: dev
+  log_level: debug
+  node_id: 0
+  port: 8000
+  global_request_timeout: 2m
+  frontend_url: http://localhost:5173
   allowed_origins:
-    -
+    - http://localhost:5173
+
+jwt:
+  secret:
+  expired: 15m
+  refresh_exp: 168h
 
 smtp:
   port:
@@ -15,11 +21,12 @@ smtp:
   pass:
 
 db:
-  url:
+  url: host=localhost user=postgres password=password dbname=lockbox_dev_db port=5432 sslmode=disable TimeZone=UTC
 
 redis:
-  url:
+  url: "redis://localhost:6379/0"
 
+# for upload an avatar, you need cloudinary
 storage:
   cloudinary:
     cloud_name:
