@@ -34,3 +34,9 @@ type VaultItemResponse struct {
 	CreatedAt       time.Time  `json:"createdAt"`
 	UpdatedAt       time.Time  `json:"updatedAt"`
 }
+
+type ItemProtectionKeyResponse struct {
+	ID              int64  `json:"itemId,string"`
+	IvProtectionKey string `json:"ivProtectionKey"`
+	ProtectionKey   string `json:"protectionKey"`
+}

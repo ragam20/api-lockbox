@@ -152,3 +152,16 @@ func (f *VaultItemQuery) ParseOrder() (string, string) {
 func CheckVaultType(vaultType string) bool {
 	return vaultType == string(VaultItemTypeNote) || vaultType == string(VaultItemTypePassword) || vaultType == string(VaultItemTypeAll)
 }
+
+type ItemProtectionKey struct {
+	ID              int64
+	IvProtectionKey string
+	ProtectionKey   string
+}
+
+type UpdateArgonConfigInput struct {
+	UserID         int64
+	AuthVerifier   string
+	ArgonConfig    ArgonConfig
+	ProtectionKeys []ItemProtectionKey
+}

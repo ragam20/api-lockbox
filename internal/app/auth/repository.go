@@ -9,6 +9,7 @@ import (
 
 type AuthRepository interface {
 	WithTx(tx *gorm.DB) AuthRepository
+	UpdateAuthVerifier(ctx context.Context, authVerifer string, userID int64) error
 	GetByEmail(ctx context.Context, email string) (User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
 	CreateUser(ctx context.Context, user User) error

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"lockbox/internal/app/tools"
 	"lockbox/internal/app/vault"
 	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/request"
@@ -14,10 +15,80 @@ import (
 
 type VaultHandler struct {
 	vaultService vault.VaultService
+	toolService  tools.ToolService
 }
 
-func NewVaultHandler(vaultService vault.VaultService) *VaultHandler {
-	return &VaultHandler{vaultService: vaultService}
+func NewVaultHandler(vaultService vault.VaultService, toolService tools.ToolService) *VaultHandler {
+	return &VaultHandler{vaultService: vaultService, toolService: toolService}
+}
+
+func (h *VaultHandler) UpdateArgonConfig(c *gin.Context) {
+	userID, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	var req request.UpdateArgonConfigRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(response.BadRequestError(apphttp.ErrTransport.Error(), "invalid request body"))
+		return
+	}
+
+	protectionKeys := make([]vault.ItemProtectionKey, 0, len(req.ProtectionKeys))
+	for _, v := range req.ProtectionKeys {
+		protectionKeys = append(protectionKeys, vault.ItemProtectionKey{
+			ID:              v.ItemID,
+			IvProtectionKey: v.IvProtectionKey,
+			ProtectionKey:   v.ProtectionKey,
+		})
+	}
+
+	err = h.toolService.UpdateArgonConfig(
+		c.Request.Context(),
+		vault.UpdateArgonConfigInput{
+			UserID:       userID,
+			AuthVerifier: req.AuthVerifier,
+			ArgonConfig: vault.ArgonConfig{
+				ID:          req.ArgonConfig.ID,
+				Iterations:  uint32(req.ArgonConfig.Iterations),
+				Memory:      uint32(req.ArgonConfig.Memory),
+				Parallelism: uint32(req.ArgonConfig.Parallelism),
+			},
+			ProtectionKeys: protectionKeys,
+		},
+	)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	response.Success(c, http.StatusOK, "success update argon config", true)
+}
+
+func (h *VaultHandler) GetProtectionKeys(c *gin.Context) {
+	userID, err := userIDFromContext(c)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	keys, err := h.vaultService.GetProtectionKeys(c.Request.Context(), userID)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	resp := make([]response.ItemProtectionKeyResponse, 0, len(keys))
+	for _, v := range keys {
+		resp = append(resp, response.ItemProtectionKeyResponse{
+			ID:              v.ID,
+			ProtectionKey:   v.ProtectionKey,
+			IvProtectionKey: v.IvProtectionKey,
+		})
+	}
+
+	response.Success(c, http.StatusOK, "success get protectionKeys", resp)
 }
 
 func (h *VaultHandler) SetFavorite(c *gin.Context) {
