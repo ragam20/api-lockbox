@@ -91,10 +91,17 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("app.port", 8000)
 	v.SetDefault("app.log_level", "debug")
 	v.SetDefault("app.node_id", 0)
-	v.SetDefault("app.request_timeout", 5*time.Second)
+	v.SetDefault("app.global_request_timeout", 2*time.Minute)
 	v.SetDefault("app.allowed_origins", []string{"http://localhost:5173"})
 	v.SetDefault("app.frontend_url", "http://localhost:5173")
+
 	v.SetDefault("jwt.refresh_exp", 168*time.Hour)
+	v.SetDefault("jwt.expired", 15*time.Minute)
+	v.SetDefault("jwt.secret", "abcdeefghijklmnopqrstuvwxyz0123456789-secret")
+
+	v.SetDefault("db.url", "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable")
+
+	v.SetDefault("redis.url", "redis://localhost:6379")
 }
 
 func isProduction(appEnv string) bool {
