@@ -57,9 +57,11 @@ func NewRoutes(
 		vaultAPI.POST("/items/:id/archive", vaultHandler.ArchiveVaultItem)
 		vaultAPI.POST("/items/:id/unarchive", vaultHandler.UnarchiveVaultItem)
 		vaultAPI.DELETE("/items/:id", vaultHandler.DeleteVaultItem)
-		vaultAPI.GET("/argon-config", vaultHandler.GetArgonConfig)
 		vaultAPI.PUT("/items/:id/favorite", vaultHandler.SetFavorite)
 		vaultAPI.DELETE("/items/:id/favorite", vaultHandler.DeleteFavorite)
+		vaultAPI.GET("/argon-config", vaultHandler.GetArgonConfig)
+		vaultAPI.GET("/items/protection-key", vaultHandler.GetProtectionKeys)
+		vaultAPI.PUT("/argon-config", vaultHandler.UpdateArgonConfig)
 	}
 
 	userAPI := api.Group("/user",

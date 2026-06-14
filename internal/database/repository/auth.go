@@ -23,6 +23,23 @@ func (r *authRepository) WithTx(tx *gorm.DB) auth.AuthRepository {
 	return &authRepository{BaseRepository: NewBaseRepository(tx)}
 }
 
+func (r *authRepository) UpdateAuthVerifier(ctx context.Context, authVerifier string, userID int64) error {
+	result := r.DB(ctx).
+		Model(&entity.UserEntity{}).
+		Where("id = ?", userID).
+		Update("auth_verifier", authVerifier)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return auth.ErrUserNotFound
+	}
+
+	return nil
+}
+
 func (r *authRepository) EmailExists(ctx context.Context, email string) (bool, error) {
 	var count int64
 	if err := r.DB(ctx).

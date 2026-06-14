@@ -389,6 +389,18 @@ type mockVaultRepo struct {
 	updatedVaultItem    VaultItem
 }
 
+func (r *mockVaultRepo) GetProtectionKeys(ctx context.Context, userID int64) ([]ItemProtectionKey, error) {
+	return nil, nil
+}
+
+func (r *mockVaultRepo) UpdateProtectionKeys(ctx context.Context, keys []ItemProtectionKey) error {
+	return nil
+}
+
+func (r *mockVaultRepo) UpdateArgonConfig(ctx context.Context, argonConfig ArgonConfig) error {
+	return nil
+}
+
 func (r *mockVaultRepo) WithTx(tx *gorm.DB) VaultRepository {
 	return r
 }

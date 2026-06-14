@@ -25,6 +25,126 @@ func (r *vaultRepository) WithTx(tx *gorm.DB) vault.VaultRepository {
 	return &vaultRepository{BaseRepository: BaseRepository{tx}}
 }
 
+func (r *vaultRepository) UpdateArgonConfig(ctx context.Context, argonConfig vault.ArgonConfig) error {
+	result := r.DB(ctx).
+		Model(&entity.ArgonConfigEntity{}).
+		Where("id = ?", argonConfig.ID).
+		Updates(map[string]any{
+			"memory":      argonConfig.Memory,
+			"parallelism": argonConfig.Parallelism,
+			"time":        argonConfig.Iterations,
+		})
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return vault.ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *vaultRepository) UpdateProtectionKeys(ctx context.Context, keys []vault.ItemProtectionKey) error {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	const batchSize = 1000
+
+	return r.DB(ctx).Transaction(func(tx *gorm.DB) error {
+		for i := 0; i < len(keys); i += batchSize {
+			end := min(i+batchSize, len(keys))
+
+			if err := updateProtectionKeysBatch(tx, keys[i:end]); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+func updateProtectionKeysBatch(
+	tx *gorm.DB,
+	keys []vault.ItemProtectionKey,
+) error {
+	var (
+		ids              = make([]int64, 0, len(keys))
+		protectionArgs   = make([]any, 0, len(keys)*2)
+		ivArgs           = make([]any, 0, len(keys)*2)
+		protectionCase   strings.Builder
+		ivProtectionCase strings.Builder
+	)
+
+	protectionCase.WriteString("CASE id ")
+	ivProtectionCase.WriteString("CASE id ")
+
+	for _, key := range keys {
+		ids = append(ids, key.ID)
+
+		protectionCase.WriteString("WHEN ? THEN ? ")
+		protectionArgs = append(
+			protectionArgs,
+			key.ID,
+			key.ProtectionKey,
+		)
+
+		ivProtectionCase.WriteString("WHEN ? THEN ? ")
+		ivArgs = append(
+			ivArgs,
+			key.ID,
+			key.IvProtectionKey,
+		)
+	}
+
+	protectionCase.WriteString("END")
+	ivProtectionCase.WriteString("END")
+
+	args := make([]any, 0)
+
+	args = append(args, protectionArgs...)
+	args = append(args, ivArgs...)
+
+	query := fmt.Sprintf(`
+		UPDATE vault_items
+		SET
+			protection_key = %s,
+			iv_protection_key = %s
+		WHERE id IN ?
+	`, protectionCase.String(), ivProtectionCase.String())
+
+	args = append(args, ids)
+
+	return tx.Exec(query, args...).Error
+}
+
+func (r *vaultRepository) GetProtectionKeys(ctx context.Context, userID int64) ([]vault.ItemProtectionKey, error) {
+	var e []entity.VaultItemEntity
+	err := r.DB(ctx).
+		Model(&entity.VaultItemEntity{}).
+		Joins("JOIN vaults ON vaults.id = vault_items.vault_id").
+		Where("vaults.user_id = ?", userID).
+		Where("vault_items.deleted_at IS NULL").
+		Find(&e).
+		Error
+	if err != nil {
+		return []vault.ItemProtectionKey{}, nil
+	}
+
+	result := make([]vault.ItemProtectionKey, len(e))
+
+	for i, v := range e {
+		result[i] = vault.ItemProtectionKey{
+			ID:              v.ID,
+			ProtectionKey:   v.ProtectionKey,
+			IvProtectionKey: v.IvProtectionKey,
+		}
+	}
+	return result, nil
+}
+
 func (r *vaultRepository) SetFavorite(ctx context.Context, itemID int64) error {
 	result := r.DB(ctx).Model(&entity.VaultItemEntity{}).
 		Where("id = ?", itemID).

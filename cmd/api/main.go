@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"lockbox/internal/app/auth"
+	"lockbox/internal/app/tools"
 	"lockbox/internal/app/user"
 	"lockbox/internal/app/vault"
 	"lockbox/internal/cache"
@@ -27,7 +28,8 @@ import (
 )
 
 func main() {
-	configModule := fx.Module("config",
+	configModule := fx.Module(
+		"config",
 		fx.Provide(
 			config.NewEnv,
 			config.NewConfig,
@@ -41,7 +43,8 @@ func main() {
 		),
 	)
 
-	infraModule := fx.Module("infra",
+	infraModule := fx.Module(
+		"infra",
 		fx.Provide(
 			idgen.NewIDGen,
 			logger.NewLogger,
@@ -51,7 +54,8 @@ func main() {
 		),
 	)
 
-	databaseModule := fx.Module("database",
+	databaseModule := fx.Module(
+		"database",
 		fx.Provide(
 			database.NewPostgresConnection,
 			dbtx.NewTransactionManager,
@@ -60,7 +64,8 @@ func main() {
 		),
 	)
 
-	repositoryModule := fx.Module("repository",
+	repositoryModule := fx.Module(
+		"repository",
 		fx.Provide(
 			repository.NewAuthRepository,
 			repository.NewUserRepository,
@@ -68,7 +73,8 @@ func main() {
 		),
 	)
 
-	authModule := fx.Module("auth",
+	authModule := fx.Module(
+		"auth",
 		fx.Provide(
 			auth.NewTokenManager,
 			auth.NewAuthService,
@@ -76,21 +82,25 @@ func main() {
 		),
 	)
 
-	userModule := fx.Module("user",
+	userModule := fx.Module(
+		"user",
 		fx.Provide(
 			user.NewUserService,
 			handler.NewUserHandler,
 		),
 	)
 
-	vaultModule := fx.Module("vault",
+	vaultModule := fx.Module(
+		"vault",
 		fx.Provide(
 			vault.NewVaultService,
+			tools.NewToolService,
 			handler.NewVaultHandler,
 		),
 	)
 
-	appHTTPModule := fx.Module("apphttp",
+	appHTTPModule := fx.Module(
+		"apphttp",
 		fx.Provide(
 			middleware.NewErrorMiddleware,
 			middleware.NewRecoveryMiddleware,

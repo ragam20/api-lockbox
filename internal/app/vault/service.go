@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	dbtx "lockbox/internal/database/transaction"
 	"lockbox/internal/http/response"
 	"lockbox/internal/idgen"
 
@@ -17,17 +18,18 @@ import (
 const (
 	defaultArgonMemory      = 64 * 1024
 	defaultArgonIterations  = 3
-	defaultArgonParallelism = 2
+	defaultArgonParallelism = 3
 	defaultVaultTimeout     = 10
 	defaultVaultTimeoutType = VaultTimeoutTypeLock
 )
 
 type (
 	VaultService interface {
+		GetProtectionKeys(ctx context.Context, userID int64) ([]ItemProtectionKey, error)
+		GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error)
 		SetFavorite(ctx context.Context, itemID int64) error
 		DeleteFavorite(ctx context.Context, itemID int64) error
 		GetVault(ctx context.Context, userID int64) (Vault, error)
-		GetArgonConfig(ctx context.Context, userID int64) (ArgonConfig, error)
 		CreateVault(ctx context.Context, userID int64, vaultKeySalt string) error
 		CreateArgonConfig(ctx context.Context, userID int64) error
 		GetVaultItems(ctx context.Context, input GetVaultInput) (GetVaultItemsResult, error)
@@ -43,14 +45,34 @@ type (
 	vaultService struct {
 		vaultRepo VaultRepository
 		idGen     idgen.IDGenerator
+		txManager dbtx.TransactionManager
 	}
 )
 
-func NewVaultService(vaultRepo VaultRepository, idGen idgen.IDGenerator) VaultService {
+func NewVaultService(vaultRepo VaultRepository, idGen idgen.IDGenerator, dbtx dbtx.TransactionManager) VaultService {
 	return &vaultService{
 		vaultRepo: vaultRepo,
 		idGen:     idGen,
+		txManager: dbtx,
 	}
+}
+
+func (s *vaultService) GetProtectionKeys(ctx context.Context, userID int64) ([]ItemProtectionKey, error) {
+	keys, err := s.vaultRepo.GetProtectionKeys(ctx, userID)
+	if err != nil {
+		return []ItemProtectionKey{}, response.InternalServerError(err.Error())
+	}
+
+	result := make([]ItemProtectionKey, 0, len(keys))
+	for _, v := range keys {
+		result = append(result, ItemProtectionKey{
+			ID:              v.ID,
+			ProtectionKey:   v.ProtectionKey,
+			IvProtectionKey: v.IvProtectionKey,
+		})
+	}
+
+	return result, nil
 }
 
 func (s *vaultService) SetFavorite(ctx context.Context, itemID int64) error {

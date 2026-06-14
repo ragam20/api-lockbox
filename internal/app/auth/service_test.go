@@ -137,6 +137,10 @@ type mockAuthRepo struct {
 	withTxCalls int
 }
 
+func (r *mockAuthRepo) UpdateAuthVerifier(ctx context.Context, authVerifier string, userID int64) error {
+	return nil
+}
+
 func (r *mockAuthRepo) WithTx(tx *gorm.DB) AuthRepository {
 	r.withTxCalls++
 	return r

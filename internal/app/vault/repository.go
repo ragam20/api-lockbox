@@ -8,6 +8,9 @@ import (
 
 type VaultRepository interface {
 	WithTx(tx *gorm.DB) VaultRepository
+	UpdateProtectionKeys(ctx context.Context, keys []ItemProtectionKey) error
+	GetProtectionKeys(ctx context.Context, userID int64) ([]ItemProtectionKey, error)
+	UpdateArgonConfig(ctx context.Context, argonConfig ArgonConfig) error
 	SetFavorite(ctx context.Context, itemID int64) error
 	DeleteFavorite(ctx context.Context, itemID int64) error
 	GetVault(ctx context.Context, userID int64) (Vault, error)
