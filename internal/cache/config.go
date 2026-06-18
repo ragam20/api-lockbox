@@ -1,8 +1,6 @@
 package cache
 
 import (
-	"crypto/tls"
-
 	"lockbox/internal/config"
 	appLogger "lockbox/internal/logger"
 
@@ -20,9 +18,9 @@ func NewRedisClient(
 		return nil
 	}
 
-	if appCfg.Env == "production" {
-		opt.TLSConfig = &tls.Config{}
-	}
+	// if appCfg.Env == "production" {
+	// 	opt.TLSConfig = &tls.Config{}
+	// }
 
 	client := redis.NewClient(opt)
 
