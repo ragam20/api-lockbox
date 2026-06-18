@@ -21,7 +21,8 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          # cache: false because I use self-hosted
+          cache: false
 
       - run: go mod download
       - run: go test ./internal/app/...
