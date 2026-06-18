@@ -23,29 +23,28 @@ type Env struct {
 func NewEnv() (*Env, error) {
 	appEnv := normalizeAppEnv(getAppEnv())
 
-	configName := "development"
-	if isProduction(appEnv) {
-		configName = "production"
-	}
-
-	fmt.Println("NewEnv() -> " + configName)
-
 	v := viper.New()
-	v.SetConfigName(configName)
-	v.SetConfigType("yaml")
-	v.AddConfigPath("internal/config")
-	v.AddConfigPath(".")
+
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	v.AutomaticEnv()
 
 	setDefaults(v)
 
-	if err := v.ReadInConfig(); err != nil {
-		var notFound viper.ConfigFileNotFoundError
-		if !errors.As(err, &notFound) {
-			return nil, fmt.Errorf("read config %q: %w", configName, err)
+	if !isProduction(appEnv) {
+		v.SetConfigName("development")
+		v.SetConfigType("yaml")
+		v.AddConfigPath("internal/config")
+		v.AddConfigPath(".")
+
+		if err := v.ReadInConfig(); err != nil {
+			var notFound viper.ConfigFileNotFoundError
+
+			if !errors.As(err, &notFound) {
+				return nil, fmt.Errorf("read development config: %w", err)
+			}
+
+			return nil, fmt.Errorf("development.yaml not found: %w", err)
 		}
-		return nil, fmt.Errorf("read config %q: %w", configName, err)
 	}
 
 	if err := bindEnvs(v, getKeys()); err != nil {
@@ -53,11 +52,13 @@ func NewEnv() (*Env, error) {
 	}
 
 	var env Env
+
 	if err := v.Unmarshal(&env); err != nil {
-		return nil, fmt.Errorf("parse config %q: %w", configName, err)
+		return nil, fmt.Errorf("parse config: %w", err)
 	}
+
 	if err := env.Validate(); err != nil {
-		return nil, fmt.Errorf("validate config %q: %w", configName, err)
+		return nil, fmt.Errorf("validate config: %w", err)
 	}
 
 	data, _ := json.Marshal(map[string]any{
