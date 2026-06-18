@@ -290,10 +290,7 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 		return response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
 	}
 
-	exists, err := s.authRepo.EmailExists(ctx, email)
-	if err != nil {
-		return response.InternalServerError("failed to check email")
-	}
+	exists, _ := s.authRepo.EmailExists(ctx, email)
 	if exists {
 		return response.NewAppErr(http.StatusConflict, ErrEmailAlreadyExists.Error(), "email already registered")
 	}
