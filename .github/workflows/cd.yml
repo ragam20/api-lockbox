@@ -21,9 +21,4 @@ jobs:
     steps:
       - name: Deploy
         run: |
-          cd "$HOME/deploy/lockbox/api-lockbox"
-
-          git fetch origin
-          git reset --hard origin/main
-
-          docker compose -f "$HOME/deploy/lockbox/app" up -d --build
+          $HOME/deploy/lockbox/app/deploy.sh
