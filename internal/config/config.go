@@ -35,6 +35,7 @@ type JWTConfig struct {
 
 type RedisConfig struct {
 	URL string `mapstructure:"url"`
+	TLS bool   `mapstructure:"tls"`
 }
 
 type SMTPConfig struct {
@@ -42,6 +43,7 @@ type SMTPConfig struct {
 	Host string `mapstructure:"host"`
 	User string `mapstructure:"user"`
 	Pass string `mapstructure:"pass"`
+	TLS  bool   `mapstructure:"tls"`
 }
 
 type Config struct {
