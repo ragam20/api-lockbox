@@ -1,0 +1,94 @@
+services:
+  api:
+    container_name: api-lockbox
+    restart: always
+    ports:
+      - "8001:8000"
+    build: .
+    depends_on:
+      - database
+      - redis
+
+    environment:
+      APP_ALLOWED_ORIGINS: ${APP_ALLOWED_ORIGINS}
+      APP_ENV: ${APP_ENV}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL}
+      APP_NODE_ID: ${APP_NODE_ID}
+      APP_PORT: ${APP_PORT}
+      APP_GLOBAL_REQUEST_TIMEOUT: ${APP_GLOBAL_REQUEST_TIMEOUT}
+      APP_VERSION: ${APP_VERSION}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL}
+
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRED: ${JWT_EXPIRED}
+      JWT_REFRESH_EXP: ${JWT_REFRESH_EXP}
+
+      DB_URL: ${DB_URL}
+
+      REDIS_URL: ${REDIS_URL}
+
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+
+      STORAGE_CLOUDINARY_CLOUD_NAME: ${STORAGE_CLOUDINARY_CLOUD_NAME}
+      STORAGE_CLOUDINARY_API_SECRET: ${STORAGE_CLOUDINARY_API_SECRET}
+      STORAGE_CLOUDINARY_API_KEY: ${STORAGE_CLOUDINARY_API_KEY}
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  database:
+    image: postgres:16-alpine
+    container_name: lockbox-postgres
+    restart: always
+    expose:
+      - "5432"
+    volumes:
+      - lockbox_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 4
+      timeout: 7s
+      start_period: 10s
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: UTC
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:7-alpine
+    container_name: lockbox-redis
+    restart: always
+    expose:
+      - "6379"
+    volumes:
+      - lockbox_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 4
+      start_period: 5s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  lockbox_db_data:
+  lockbox_redis_data:

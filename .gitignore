@@ -2,3 +2,4 @@
 /internal/config/production.yaml
 .gocache
 tmp
+.env

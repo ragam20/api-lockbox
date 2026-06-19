@@ -57,6 +57,10 @@ func NewEnv() (*Env, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
+	if isProduction(appEnv) {
+		applyOverrides(&env)
+	}
+
 	if err := env.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
 	}
@@ -73,7 +77,7 @@ func NewEnv() (*Env, error) {
 }
 
 func getAppEnv() string {
-	for _, key := range []string{"APP_ENV", "ENV_APP", "env_app"} {
+	for _, key := range []string{"APP_ENV", "app_env"} {
 		if value, ok := os.LookupEnv(key); ok {
 			return value
 		}
@@ -84,6 +88,27 @@ func getAppEnv() string {
 
 func normalizeAppEnv(appEnv string) string {
 	return strings.ToLower(strings.TrimSpace(appEnv))
+}
+
+func applyOverrides(env *Env) {
+	if origins := os.Getenv("APP_ALLOWED_ORIGINS"); origins != "" {
+		env.App.AllowedOrigins = getEnvArray(origins)
+	}
+}
+
+func getEnvArray(key string) []string {
+	value := os.Getenv(key)
+
+	if value == "" {
+		return []string{}
+	}
+
+	parts := strings.Split(value, ",")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
+
+	return parts
 }
 
 func setDefaults(v *viper.Viper) {
@@ -98,7 +123,6 @@ func setDefaults(v *viper.Viper) {
 
 	v.SetDefault("jwt.refresh_exp", 168*time.Hour)
 	v.SetDefault("jwt.expired", 15*time.Minute)
-	v.SetDefault("jwt.secret", "abcdeefghijklmnopqrstuvwxyz0123456789-secret")
 
 	v.SetDefault("db.url", "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable")
 
@@ -125,7 +149,7 @@ func getKeys() []string {
 		"app.log_level",
 		"app.node_id",
 		"app.port",
-		"app.request_timeout",
+		"app.global_request_timeout",
 		"app.version",
 		"app.frontend_url",
 
