@@ -61,6 +61,9 @@ func NewEnv() (*Env, error) {
 		applyOverrides(&env)
 	}
 
+	fmt.Println("smtp.tls:", env.SMTPConfig.TLS)
+	fmt.Println("redis.tls:", env.RedisConfig.TLS)
+
 	if err := env.Validate(); err != nil {
 		return nil, fmt.Errorf("validate config: %w", err)
 	}
@@ -125,6 +128,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("db.url", "postgresql://postgres:postgres@localhost:5432/postgres?sslmode=disable")
 
 	v.SetDefault("redis.url", "redis://localhost:6379")
+	v.SetDefault("redis.tls", false)
+
+	v.SetDefault("smtp.tls", false)
 }
 
 func isProduction(appEnv string) bool {
@@ -158,11 +164,13 @@ func getKeys() []string {
 		"db.url",
 
 		"redis.url",
+		"redis.tls",
 
 		"smtp.port",
 		"smtp.host",
 		"smtp.user",
 		"smtp.pass",
+		"smtp.tls",
 
 		"storage.cloudinary.cloud_name",
 		"storage.cloudinary.api_secret",
