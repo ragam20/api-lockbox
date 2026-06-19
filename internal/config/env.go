@@ -96,9 +96,7 @@ func applyOverrides(env *Env) {
 	}
 }
 
-func getEnvArray(key string) []string {
-	value := os.Getenv(key)
-
+func getEnvArray(value string) []string {
 	if value == "" {
 		return []string{}
 	}
