@@ -1,7 +1,6 @@
 package smtp
 
 import (
-	"context"
 	"fmt"
 
 	"lockbox/internal/http/response"
@@ -10,7 +9,7 @@ import (
 )
 
 type MailService interface {
-	SendVerifyLink(ctx context.Context, email string, link string) error
+	SendVerifyLink(email string, link string) error
 	SendOTP(email string, otp string) error
 }
 
@@ -22,7 +21,7 @@ func NewMailService(cfg *SMTPConfig) MailService {
 	return &mailService{cfg: cfg}
 }
 
-func (m *mailService) SendVerifyLink(ctx context.Context, email string, link string) error {
+func (m *mailService) SendVerifyLink(email string, link string) error {
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", m.cfg.From)
 	msg.SetHeader("To", email)

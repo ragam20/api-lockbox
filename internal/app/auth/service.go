@@ -298,7 +298,7 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 	}
 
 	link := s.verificationLink(token)
-	if err := s.mail.SendVerifyLink(ctx, email, link); err != nil {
+	if err := s.mail.SendVerifyLink(email, link); err != nil {
 		return response.InternalServerError("failed to send verification link")
 	}
 
