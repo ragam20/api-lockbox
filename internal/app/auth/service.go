@@ -90,11 +90,6 @@ func (s *authService) RequestOTP(ctx context.Context, email string) (response.Re
 		return response.RequestOTPResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
 	}
 
-	isEmailExist, _ := s.authRepo.EmailExists(ctx, email)
-	if !isEmailExist {
-		return response.RequestOTPResponse{}, response.BadRequestError(ErrUserNotFound.Error(), "email not found")
-	}
-
 	otp, err := generateOTP()
 	if err != nil {
 		return response.RequestOTPResponse{}, response.InternalServerError("failed to generate otp")
@@ -104,9 +99,7 @@ func (s *authService) RequestOTP(ctx context.Context, email string) (response.Re
 		return response.RequestOTPResponse{}, response.InternalServerError("failed to store otp")
 	}
 
-	mailCtx, cancel := context.WithTimeout(ctx, externalResourceTimeout)
-	defer cancel()
-	if err := s.mail.SendOTP(mailCtx, email, otp); err != nil {
+	if err := s.mail.SendOTP(email, otp); err != nil {
 		_ = s.cache.Del(ctx, otpCacheKey(email))
 		return response.RequestOTPResponse{}, err
 	}
@@ -305,7 +298,7 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 	}
 
 	link := s.verificationLink(token)
-	if err := s.mail.SendVerifyLink(ctx, email, link); err != nil {
+	if err := s.mail.SendVerifyLink(email, link); err != nil {
 		return response.InternalServerError("failed to send verification link")
 	}
 
