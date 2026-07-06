@@ -11,7 +11,7 @@ import (
 
 type MailService interface {
 	SendVerifyLink(ctx context.Context, email string, link string) error
-	SendOTP(ctx context.Context, email string, otp string) error
+	SendOTP(email string, otp string) error
 }
 
 type mailService struct {
@@ -23,12 +23,6 @@ func NewMailService(cfg *SMTPConfig) MailService {
 }
 
 func (m *mailService) SendVerifyLink(ctx context.Context, email string, link string) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", m.cfg.From)
 	msg.SetHeader("To", email)
@@ -42,13 +36,7 @@ func (m *mailService) SendVerifyLink(ctx context.Context, email string, link str
 	return nil
 }
 
-func (m *mailService) SendOTP(ctx context.Context, email string, otp string) error {
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
+func (m *mailService) SendOTP(email string, otp string) error {
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", m.cfg.From)
 	msg.SetHeader("To", email)

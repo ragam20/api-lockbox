@@ -99,9 +99,7 @@ func (s *authService) RequestOTP(ctx context.Context, email string) (response.Re
 		return response.RequestOTPResponse{}, response.InternalServerError("failed to store otp")
 	}
 
-	mailCtx, cancel := context.WithTimeout(ctx, externalResourceTimeout)
-	defer cancel()
-	if err := s.mail.SendOTP(mailCtx, email, otp); err != nil {
+	if err := s.mail.SendOTP(email, otp); err != nil {
 		_ = s.cache.Del(ctx, otpCacheKey(email))
 		return response.RequestOTPResponse{}, err
 	}
