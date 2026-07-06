@@ -90,6 +90,12 @@ func (s *authService) RequestOTP(ctx context.Context, email string) (response.Re
 		return response.RequestOTPResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
 	}
 
+	if exists, _ := s.authRepo.EmailExists(ctx, email); !exists {
+		return response.RequestOTPResponse{
+			ExpiresIn: otpExpiresInSeconds,
+		}, nil
+	}
+
 	otp, err := generateOTP()
 	if err != nil {
 		return response.RequestOTPResponse{}, response.InternalServerError("failed to generate otp")
