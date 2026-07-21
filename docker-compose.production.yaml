@@ -6,8 +6,12 @@ services:
       - "8001:8000"
     build: .
     depends_on:
-      - database
-      - redis
+      database:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
     environment:
       APP_ALLOWED_ORIGINS: ${APP_ALLOWED_ORIGINS}
@@ -90,6 +94,20 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  migrate:
+    build: .
+    entrypoint: ["/app/lockbox_migrate"]
+    command: ["bootstrap"]
+    restart: no
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL}
+
+      DB_URL: ${DB_URL}
 
 volumes:
   lockbox_db_data:
