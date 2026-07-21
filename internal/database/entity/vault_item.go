@@ -1,12 +1,9 @@
 package entity
 
 import (
-	"errors"
 	"time"
 
 	"lockbox/internal/app/vault"
-
-	"gorm.io/gorm"
 )
 
 type VaultItemType string
@@ -16,14 +13,6 @@ const (
 	VaultItemTypeNote     VaultItemType = "note"
 	VaultItemTypeAPIKey   VaultItemType = "apiKey"
 )
-
-func (t VaultItemType) IsValid() bool {
-	switch t {
-	case VaultItemTypeNote, VaultItemTypePassword, VaultItemTypeAPIKey:
-		return true
-	}
-	return false
-}
 
 type VaultItemEntity struct {
 	ID      int64 `gorm:"primaryKey"`
@@ -50,13 +39,6 @@ type VaultItemEntity struct {
 
 func (VaultItemEntity) TableName() string {
 	return "vault_items"
-}
-
-func (e *VaultItemEntity) BeforeSave(tx *gorm.DB) error {
-	if !e.ItemType.IsValid() {
-		return errors.New("invalid item type")
-	}
-	return nil
 }
 
 func (e VaultItemEntity) ToDomain() vault.VaultItem {
