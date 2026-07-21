@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/spf13/viper"
 )
 
@@ -21,6 +23,62 @@ type Env struct {
 }
 
 func NewEnv() (*Env, error) {
+	env, err := loadEnv(getKeys())
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("smtp.tls:", env.SMTPConfig.TLS)
+	fmt.Println("redis.tls:", env.RedisConfig.TLS)
+
+	if err := env.Validate(); err != nil {
+		return nil, fmt.Errorf("validate config: %w", err)
+	}
+
+	logConfigLoad(env)
+
+	return env, nil
+}
+
+func NewMigrationEnv() (*Env, error) {
+	env, err := loadEnv(getMigrationKeys())
+	if err != nil {
+		return nil, err
+	}
+
+	if err := env.ValidateMigration(); err != nil {
+		return nil, fmt.Errorf("validate config: %w", err)
+	}
+
+	return env, nil
+}
+
+func (e *Env) ValidateMigration() error {
+	var errs []string
+
+	validateMigrationAppConfig(e.App, &errs)
+	validateDatabaseConfig(e.Database, &errs)
+
+	if len(errs) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("invalid config: %s", strings.Join(errs, "; "))
+}
+
+func validateMigrationAppConfig(cfg AppConfig, errs *[]string) {
+	if strings.TrimSpace(cfg.Env) == "" {
+		*errs = append(*errs, "app.env is required")
+	}
+
+	if strings.TrimSpace(cfg.LogLevel) == "" {
+		*errs = append(*errs, "app.log_level is required")
+	} else if _, err := zerolog.ParseLevel(cfg.LogLevel); err != nil {
+		*errs = append(*errs, "app.log_level is invalid")
+	}
+}
+
+func loadEnv(keys []string) (*Env, error) {
 	appEnv := normalizeAppEnv(getAppEnv())
 
 	v := viper.New()
@@ -47,7 +105,7 @@ func NewEnv() (*Env, error) {
 		}
 	}
 
-	if err := bindEnvs(v, getKeys()); err != nil {
+	if err := bindEnvs(v, keys); err != nil {
 		return nil, fmt.Errorf("bind env: %w", err)
 	}
 
@@ -57,17 +115,18 @@ func NewEnv() (*Env, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
+	if appEnv != "" {
+		env.App.Env = appEnv
+	}
+
 	if isProduction(appEnv) {
 		applyOverrides(&env)
 	}
 
-	fmt.Println("smtp.tls:", env.SMTPConfig.TLS)
-	fmt.Println("redis.tls:", env.RedisConfig.TLS)
+	return &env, nil
+}
 
-	if err := env.Validate(); err != nil {
-		return nil, fmt.Errorf("validate config: %w", err)
-	}
-
+func logConfigLoad(env *Env) {
 	data, _ := json.Marshal(map[string]any{
 		"level": "info",
 		"env":   env.App.Env,
@@ -75,8 +134,6 @@ func NewEnv() (*Env, error) {
 		"msg":   "config load",
 	})
 	fmt.Println(string(data))
-
-	return &env, nil
 }
 
 func getAppEnv() string {
@@ -175,5 +232,13 @@ func getKeys() []string {
 		"storage.cloudinary.cloud_name",
 		"storage.cloudinary.api_secret",
 		"storage.cloudinary.api_key",
+	}
+}
+
+func getMigrationKeys() []string {
+	return []string{
+		"app.env",
+		"app.log_level",
+		"db.url",
 	}
 }
