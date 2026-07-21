@@ -462,7 +462,7 @@ func validateVaultItemFields(
 
 func (t VaultItemType) IsValid() bool {
 	switch t {
-	case VaultItemTypePassword, VaultItemTypeNote:
+	case VaultItemTypePassword, VaultItemTypeNote, VaultItemTypeAPIKey:
 		return true
 	}
 	return false
