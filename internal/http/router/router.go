@@ -5,7 +5,10 @@ import (
 	"time"
 
 	apphttp "lockbox/internal/http"
-	"lockbox/internal/http/handler"
+
+	authrest "lockbox/internal/app/auth/delivery/rest"
+	userrest "lockbox/internal/app/user/delivery/rest"
+	vaultrest "lockbox/internal/app/vault/delivery/rest"
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/response"
 
@@ -14,9 +17,9 @@ import (
 
 func NewRoutes(
 	g *gin.Engine,
-	authHandler *handler.AuthHandler,
-	vaultHandler *handler.VaultHandler,
-	userHandler *handler.UserHandler,
+	authHandler *authrest.AuthHandler,
+	vaultHandler *vaultrest.VaultHandler,
+	userHandler *userrest.UserHandler,
 	verifyJWT *middleware.VerifyJWTMiddleware,
 	requestTimeout *middleware.RequestTimeoutMiddleware,
 ) {

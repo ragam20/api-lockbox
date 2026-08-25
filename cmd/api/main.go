@@ -5,8 +5,15 @@ import (
 	"net/http"
 
 	"lockbox/internal/app/auth"
-	"lockbox/internal/app/user"
-	"lockbox/internal/app/vault"
+	authapp "lockbox/internal/app/auth/application"
+	authrest "lockbox/internal/app/auth/delivery/rest"
+
+	userapp "lockbox/internal/app/user/application"
+	userrest "lockbox/internal/app/user/delivery/rest"
+
+	vaultapp "lockbox/internal/app/vault/application"
+	vaultrest "lockbox/internal/app/vault/delivery/rest"
+
 	"lockbox/internal/app/workflow/registration"
 	updateargon "lockbox/internal/app/workflow/update_argon"
 	"lockbox/internal/cache"
@@ -15,7 +22,6 @@ import (
 	"lockbox/internal/database/repository"
 	dbtx "lockbox/internal/database/transaction"
 	appHttp "lockbox/internal/http"
-	"lockbox/internal/http/handler"
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/router"
 	"lockbox/internal/http/server"
@@ -49,53 +55,45 @@ func main() {
 		fx.Provide(
 			idgen.NewIDGen,
 			logger.NewLogger,
+
 			smtp.NewSMTPConfig,
 			smtp.NewMailService,
-			cloudinary.NewCloudinaryService,
-		),
-	)
 
-	databaseModule := fx.Module(
-		"database",
-		fx.Provide(
-			database.NewPostgresConnection,
-			dbtx.NewTransactionManager,
+			cloudinary.NewCloudinaryService,
+
 			cache.NewRedisClient,
 			cache.NewStore,
-		),
-	)
 
-	repositoryModule := fx.Module(
-		"repository",
-		fx.Provide(
+			database.NewPostgresConnection,
 			repository.NewAuthRepository,
 			repository.NewUserRepository,
 			repository.NewVaultRepository,
+			dbtx.NewTransactionManager,
 		),
 	)
 
 	authModule := fx.Module(
 		"auth",
 		fx.Provide(
+			authapp.NewAuthService,
+			authrest.NewAuthHandler,
 			auth.NewTokenManager,
-			auth.NewAuthService,
-			handler.NewAuthHandler,
 		),
 	)
 
 	userModule := fx.Module(
 		"user",
 		fx.Provide(
-			user.NewUserService,
-			handler.NewUserHandler,
+			userapp.NewUserService,
+			userrest.NewUserHandler,
 		),
 	)
 
 	vaultModule := fx.Module(
 		"vault",
 		fx.Provide(
-			vault.NewVaultService,
-			handler.NewVaultHandler,
+			vaultapp.NewVaultService,
+			vaultrest.NewVaultHandler,
 		),
 	)
 
@@ -107,7 +105,7 @@ func main() {
 		),
 	)
 
-	appHTTPModule := fx.Module(
+	httpModule := fx.Module(
 		"apphttp",
 		fx.Provide(
 			middleware.NewErrorMiddleware,
@@ -122,10 +120,8 @@ func main() {
 
 	app := fx.New(fx.Options(
 		configModule,
-		databaseModule,
 		infraModule,
-		appHTTPModule,
-		repositoryModule,
+		httpModule,
 
 		authModule,
 		userModule,

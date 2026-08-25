@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"lockbox/internal/app/vault"
+	vaultdomain "lockbox/internal/app/vault/domain"
 )
 
 type VaultTimeoutType string
@@ -40,11 +40,11 @@ func (VaultEntity) TableName() string {
 	return "vaults"
 }
 
-func (e VaultEntity) ToDomain() vault.Vault {
-	return vault.Vault{
+func (e VaultEntity) ToDomain() vaultdomain.Vault {
+	return vaultdomain.Vault{
 		ID:           e.ID,
 		Timeout:      e.Timeout,
-		TimeoutType:  vault.VaultTimeoutType(e.TimeoutType),
+		TimeoutType:  vaultdomain.VaultTimeoutType(e.TimeoutType),
 		VaultKeySalt: e.VaultKeySalt,
 		CreatedAt:    e.CreatedAt,
 		UpdatedAt:    e.UpdatedAt,

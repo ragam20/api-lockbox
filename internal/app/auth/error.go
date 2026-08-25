@@ -1,6 +1,8 @@
 package auth
 
-import "errors"
+import (
+	"errors"
+)
 
 var (
 	ErrInvalidCredential  = errors.New("AUTH_INVALID_CREDENTIAL")

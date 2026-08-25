@@ -1,10 +1,13 @@
-package user
+package application
 
 import (
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	appuser "lockbox/internal/app/user"
+	userdomain "lockbox/internal/app/user/domain"
 
 	appResponse "lockbox/internal/http/response"
 	"lockbox/internal/storage"
@@ -13,7 +16,7 @@ import (
 func TestNewUserServiceWiresRepository(t *testing.T) {
 	publicImgID := strPtr("public-img-id")
 	repo := &mockUserRepo{
-		user: User{
+		user: userdomain.User{
 			ID:               7,
 			Name:             "Test User",
 			Email:            "user@example.com",
@@ -50,7 +53,7 @@ func TestSaveAvatarURL(t *testing.T) {
 	avatarURL := "https://cdn.example.com/avatar.png"
 	publicImgID := "lockbox/users/7/avatar"
 	repo := &mockUserRepo{
-		user: User{
+		user: userdomain.User{
 			ID:    7,
 			Name:  "Test User",
 			Email: "user@example.com",
@@ -83,7 +86,7 @@ func TestSaveAvatarURL(t *testing.T) {
 }
 
 func TestGetUserMapsNotFound(t *testing.T) {
-	service := &userService{userRepo: &mockUserRepo{err: ErrUserNotFound}}
+	service := &userService{userRepo: &mockUserRepo{err: appuser.ErrUserNotFound}}
 
 	_, err := service.GetUser(context.Background(), 7)
 	if err == nil {
@@ -91,7 +94,7 @@ func TestGetUserMapsNotFound(t *testing.T) {
 	}
 
 	appErr := mustUserAppErr(t, err)
-	if appErr.Code != ErrUserNotFound.Error() {
+	if appErr.Code != appuser.ErrUserNotFound.Error() {
 		t.Fatalf("expected not-found code, got %q", appErr.Code)
 	}
 	if appErr.Message != "user not found" {
@@ -100,7 +103,7 @@ func TestGetUserMapsNotFound(t *testing.T) {
 }
 
 func TestSaveAvatarURLMapsNotFound(t *testing.T) {
-	service := &userService{userRepo: &mockUserRepo{err: ErrUserNotFound}}
+	service := &userService{userRepo: &mockUserRepo{err: appuser.ErrUserNotFound}}
 
 	err := service.SaveAvatarURL(context.Background(), SaveAvatarURLInput{UserID: 7, PublicImgID: "public-img-id", ImgURL: "https://cdn.example.com/avatar.png"})
 	if err == nil {
@@ -108,7 +111,7 @@ func TestSaveAvatarURLMapsNotFound(t *testing.T) {
 	}
 
 	appErr := mustUserAppErr(t, err)
-	if appErr.Code != ErrUserNotFound.Error() {
+	if appErr.Code != appuser.ErrUserNotFound.Error() {
 		t.Fatalf("expected not-found code, got %q", appErr.Code)
 	}
 	if appErr.Message != "user not found" {
@@ -151,22 +154,22 @@ func TestSaveAvatarURLMapsInternalError(t *testing.T) {
 }
 
 type mockUserRepo struct {
-	user             User
+	user             userdomain.User
 	err              error
 	updateErr        error
 	calledWithUserID int64
-	updatedUser      User
+	updatedUser      userdomain.User
 }
 
-func (r *mockUserRepo) GetUser(ctx context.Context, userID int64) (User, error) {
+func (r *mockUserRepo) GetUser(ctx context.Context, userID int64) (userdomain.User, error) {
 	r.calledWithUserID = userID
 	if r.err != nil {
-		return User{}, r.err
+		return userdomain.User{}, r.err
 	}
 	return r.user, nil
 }
 
-func (r *mockUserRepo) UpdateProfile(ctx context.Context, user User) error {
+func (r *mockUserRepo) UpdateProfile(ctx context.Context, user userdomain.User) error {
 	r.updatedUser = user
 	if r.updateErr != nil {
 		return r.updateErr
@@ -174,7 +177,7 @@ func (r *mockUserRepo) UpdateProfile(ctx context.Context, user User) error {
 	return nil
 }
 
-func (r *mockUserRepo) UpdateAvatar(ctx context.Context, user User) error {
+func (r *mockUserRepo) UpdateAvatar(ctx context.Context, user userdomain.User) error {
 	r.updatedUser = user
 	if r.updateErr != nil {
 		return r.updateErr
@@ -182,7 +185,7 @@ func (r *mockUserRepo) UpdateAvatar(ctx context.Context, user User) error {
 	return nil
 }
 
-func (r *mockUserRepo) RemoveAvatar(ctx context.Context, user User) error {
+func (r *mockUserRepo) RemoveAvatar(ctx context.Context, user userdomain.User) error {
 	r.updatedUser = user
 	if r.updateErr != nil {
 		return r.updateErr

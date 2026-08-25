@@ -9,7 +9,10 @@ import (
 	"strings"
 
 	"lockbox/internal/app/auth"
-	"lockbox/internal/app/vault"
+	authapp "lockbox/internal/app/auth/application"
+	authdomain "lockbox/internal/app/auth/domain"
+	vaultdomain "lockbox/internal/app/vault/domain"
+
 	"lockbox/internal/cache"
 	dbtx "lockbox/internal/database/transaction"
 	"lockbox/internal/http/response"
@@ -19,13 +22,13 @@ import (
 )
 
 type Registration interface {
-	Execute(ctx context.Context, input auth.RegisterInput) (*auth.User, error)
+	Execute(ctx context.Context, input authapp.RegisterInput) (*authdomain.User, error)
 }
 
 type registration struct {
 	txManager    dbtx.TransactionManager
-	authRepo     auth.AuthRepository
-	vaultRepo    vault.VaultRepository
+	authRepo     authdomain.AuthRepository
+	vaultRepo    vaultdomain.VaultRepository
 	cache        cache.Store
 	idGen        idgen.IDGenerator
 	tokenManager auth.TokenManager
@@ -33,8 +36,8 @@ type registration struct {
 
 func NewRegistration(
 	txManager dbtx.TransactionManager,
-	authRepo auth.AuthRepository,
-	vaultRepo vault.VaultRepository,
+	authRepo authdomain.AuthRepository,
+	vaultRepo vaultdomain.VaultRepository,
 	cache cache.Store,
 	idGen idgen.IDGenerator,
 	tokenManager auth.TokenManager,
@@ -49,7 +52,7 @@ func NewRegistration(
 	}
 }
 
-func (s *registration) Execute(ctx context.Context, input auth.RegisterInput) (*auth.User, error) {
+func (s *registration) Execute(ctx context.Context, input authapp.RegisterInput) (*authdomain.User, error) {
 	input.Email = normalizeEmail(input.Email)
 	input.Name = strings.TrimSpace(input.Name)
 	input.Session = strings.TrimSpace(input.Session)
@@ -77,7 +80,7 @@ func (s *registration) Execute(ctx context.Context, input auth.RegisterInput) (*
 		return nil, response.NewAppErr(http.StatusConflict, auth.ErrEmailAlreadyExists.Error(), "email already registered")
 	}
 
-	user := auth.User{
+	user := authdomain.User{
 		ID:               s.idGen.NewID(),
 		Email:            input.Email,
 		Name:             input.Name,
@@ -95,12 +98,12 @@ func (s *registration) Execute(ctx context.Context, input auth.RegisterInput) (*
 			return auth.ErrFailedRegister
 		}
 
-		argonConfig := vault.NewDefaultArgonConfig(s.idGen.NewID())
+		argonConfig := vaultdomain.NewDefaultArgonConfig(s.idGen.NewID())
 		if err := vaultRepo.CreateArgonConfig(ctx, argonConfig, user.ID); err != nil {
 			return auth.ErrFailedRegister
 		}
 
-		vaultData := vault.NewDefaultVault(s.idGen.NewID(), input.VaultKeySalt)
+		vaultData := vaultdomain.NewDefaultVault(s.idGen.NewID(), input.VaultKeySalt)
 		if err := vaultRepo.CreateVault(ctx, vaultData, user.ID); err != nil {
 			return auth.ErrFailedRegister
 		}
@@ -122,7 +125,7 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-func validateRegisterInput(input auth.RegisterInput) error {
+func validateRegisterInput(input authapp.RegisterInput) error {
 	if input.Session == "" {
 		return response.BadRequestError(auth.ErrSessionRequired.Error(), "register session is required")
 	}

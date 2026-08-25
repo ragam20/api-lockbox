@@ -1,4 +1,4 @@
-package auth
+package application
 
 import (
 	"context"
@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"lockbox/internal"
-	"lockbox/internal/app/vault"
+	"lockbox/internal/app/auth"
+	"lockbox/internal/app/auth/domain"
 	"lockbox/internal/cache"
 	"lockbox/internal/config"
 	dbtx "lockbox/internal/database/transaction"
@@ -47,32 +48,29 @@ type (
 	}
 	authService struct {
 		txManager    dbtx.TransactionManager
-		authRepo     AuthRepository
-		vaultRepo    vault.VaultRepository
+		authRepo     domain.AuthRepository
 		cache        cache.Store
 		mail         smtp.MailService
 		appCfg       *config.AppConfig
 		jwtCfg       *config.JWTConfig
 		idGen        idgen.IDGenerator
-		tokenManager TokenManager
+		tokenManager auth.TokenManager
 	}
 )
 
 func NewAuthService(
 	txManager dbtx.TransactionManager,
-	authRepo AuthRepository,
-	vaultRepo vault.VaultRepository,
+	authRepo domain.AuthRepository,
 	cache cache.Store,
 	mail smtp.MailService,
 	appCfg *config.AppConfig,
 	jwtCfg *config.JWTConfig,
 	idGen idgen.IDGenerator,
-	tokenManager TokenManager,
+	tokenManager auth.TokenManager,
 ) AuthService {
 	return &authService{
 		txManager:    txManager,
 		authRepo:     authRepo,
-		vaultRepo:    vaultRepo,
 		cache:        cache,
 		mail:         mail,
 		appCfg:       appCfg,
@@ -85,7 +83,7 @@ func NewAuthService(
 func (s *authService) RequestOTP(ctx context.Context, email string) (response.RequestOTPResponse, error) {
 	email = normalizeEmail(email)
 	if email == "" {
-		return response.RequestOTPResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
+		return response.RequestOTPResponse{}, response.BadRequestError(auth.ErrFieldEmailRequired.Error(), "email is required")
 	}
 
 	if exists, _ := s.authRepo.EmailExists(ctx, email); !exists {
@@ -117,27 +115,27 @@ func (s *authService) VerifyOTP(ctx context.Context, input VerifyOTPInput) (resp
 	email := normalizeEmail(input.Email)
 	otp := strings.TrimSpace(input.OTP)
 	if email == "" {
-		return response.VerifyOTPResponse{}, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
+		return response.VerifyOTPResponse{}, response.BadRequestError(auth.ErrFieldEmailRequired.Error(), "email is required")
 	}
 	if !isOTP(otp) {
-		return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidOTP.Error(), "otp must be a 6 digit number")
+		return response.VerifyOTPResponse{}, response.BadRequestError(auth.ErrInvalidOTP.Error(), "otp must be a 6 digit number")
 	}
 
 	storedOTP, err := s.cache.Get(ctx, otpCacheKey(email))
 	if err != nil {
 		if cache.IsMiss(err) {
-			return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidOTP.Error(), "otp is invalid or expired")
+			return response.VerifyOTPResponse{}, response.BadRequestError(auth.ErrInvalidOTP.Error(), "otp is invalid or expired")
 		}
 		return response.VerifyOTPResponse{}, response.InternalServerError("failed to validate otp")
 	}
 	if storedOTP != otp {
-		return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidOTP.Error(), "otp is invalid or expired")
+		return response.VerifyOTPResponse{}, response.BadRequestError(auth.ErrInvalidOTP.Error(), "otp is invalid or expired")
 	}
 
 	user, err := s.authRepo.GetByEmail(ctx, email)
 	if err != nil {
-		if errors.Is(err, ErrUserNotFound) {
-			return response.VerifyOTPResponse{}, response.BadRequestError(ErrUserNotFound.Error(), "user not found")
+		if errors.Is(err, auth.ErrUserNotFound) {
+			return response.VerifyOTPResponse{}, response.BadRequestError(auth.ErrUserNotFound.Error(), "user not found")
 		}
 		return response.VerifyOTPResponse{}, response.InternalServerError(err.Error())
 	}
@@ -155,7 +153,7 @@ func (s *authService) VerifyOTP(ctx context.Context, input VerifyOTPInput) (resp
 	}
 
 	if err := s.authRepo.CreateSession(ctx, user.ID, userSession); err != nil {
-		return response.VerifyOTPResponse{}, response.BadRequestError(ErrInvalidCredential.Error(), "invalid create session")
+		return response.VerifyOTPResponse{}, response.BadRequestError(auth.ErrInvalidCredential.Error(), "invalid create session")
 	}
 
 	return response.VerifyOTPResponse{
@@ -179,7 +177,7 @@ func (s *authService) Logout(ctx context.Context, userID int64, token string) {
 
 	tokenHash := internal.HashString(token)
 	if err := s.authRepo.RevokeSession(ctx, userID, tokenHash); err != nil {
-		if errors.Is(err, ErrTokenNotFound) {
+		if errors.Is(err, auth.ErrTokenNotFound) {
 			return
 		}
 	}
@@ -188,19 +186,19 @@ func (s *authService) Logout(ctx context.Context, userID int64, token string) {
 func (s *authService) Login(ctx context.Context, loginInput LoginInput) (bool, error) {
 	email := normalizeEmail(loginInput.Email)
 	if email == "" {
-		return false, response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
+		return false, response.BadRequestError(auth.ErrFieldEmailRequired.Error(), "email is required")
 	}
 
 	user, err := s.authRepo.GetByEmail(ctx, email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return false, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
+			return false, response.BadRequestError(auth.ErrInvalidCredential.Error(), "invalid credentials")
 		}
 		return false, response.InternalServerError(err.Error())
 	}
 
 	if !internal.VerifyPassword([]byte(loginInput.Verifier), []byte(user.AuthVerifier)) {
-		return false, response.BadRequestError(ErrInvalidCredential.Error(), "invalid credentials")
+		return false, response.BadRequestError(auth.ErrInvalidCredential.Error(), "invalid credentials")
 	}
 
 	return true, nil
@@ -226,7 +224,7 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 	}
 
 	if session.RevokeAt != nil {
-		return response.TokenResponse{}, response.BadRequestError(ErrTokenExpired.Error(), "refresh token expired")
+		return response.TokenResponse{}, response.BadRequestError(auth.ErrTokenExpired.Error(), "refresh token expired")
 	}
 
 	now := time.Now().UTC()
@@ -263,17 +261,17 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (re
 
 func (s *authService) GetRegisterSession(ctx context.Context, session string) (response.RegisterSessionResponse, error) {
 	if session == "" {
-		return response.RegisterSessionResponse{}, response.BadRequestError(ErrSessionRequired.Error(), "session is required")
+		return response.RegisterSessionResponse{}, response.BadRequestError(auth.ErrSessionRequired.Error(), "session is required")
 	}
 
 	isSession, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(session))
 	if err != nil || isSession == "" {
-		return response.RegisterSessionResponse{}, response.BadRequestError(ErrSessionRequired.Error(), "session not found")
+		return response.RegisterSessionResponse{}, response.BadRequestError(auth.ErrSessionRequired.Error(), "session not found")
 	}
 
 	email, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(session))
 	if err != nil || email == "" {
-		return response.RegisterSessionResponse{}, response.BadRequestError(ErrSessionRequired.Error(), "session data not found")
+		return response.RegisterSessionResponse{}, response.BadRequestError(auth.ErrSessionRequired.Error(), "session data not found")
 	}
 
 	return response.RegisterSessionResponse{
@@ -284,12 +282,12 @@ func (s *authService) GetRegisterSession(ctx context.Context, session string) (r
 func (s *authService) SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error {
 	email := normalizeEmail(input.Email)
 	if email == "" {
-		return response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
+		return response.BadRequestError(auth.ErrFieldEmailRequired.Error(), "email is required")
 	}
 
 	exists, _ := s.authRepo.EmailExists(ctx, email)
 	if exists {
-		return response.NewAppErr(http.StatusConflict, ErrEmailAlreadyExists.Error(), "email already registered")
+		return response.NewAppErr(http.StatusConflict, auth.ErrEmailAlreadyExists.Error(), "email already registered")
 	}
 
 	token, err := s.tokenManager.GenerateSecureToken(tokenByteSize)
@@ -312,13 +310,13 @@ func (s *authService) SendVerifyLink(ctx context.Context, input SendVerification
 func (s *authService) VerifyEmail(ctx context.Context, token string) (string, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
-		return "", response.BadRequestError(ErrTokenExpired.Error(), "token is required")
+		return "", response.BadRequestError(auth.ErrTokenExpired.Error(), "token is required")
 	}
 
 	email, err := s.cache.GetDel(ctx, s.tokenManager.RegisterVerificationKey(token))
 	if err != nil {
 		if cache.IsMiss(err) {
-			return "", response.BadRequestError(ErrTokenExpired.Error(), "verification token is invalid or expired")
+			return "", response.BadRequestError(auth.ErrTokenExpired.Error(), "verification token is invalid or expired")
 		}
 		return "", response.InternalServerError("failed to validate verification token")
 	}

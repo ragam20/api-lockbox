@@ -1,9 +1,11 @@
-package vault
+package application
 
 import (
 	"context"
 	"errors"
 	"testing"
+
+	appvault "lockbox/internal/app/vault"
 	"time"
 
 	appResponse "lockbox/internal/http/response"
@@ -34,14 +36,14 @@ func TestGetArgonConfigReturnsConfigAndMapsMissing(t *testing.T) {
 		t.Fatalf("expected userID 7 to be queried, got %d", repo.getArgonConfigUserID)
 	}
 
-	repo.getArgonConfigErr = ErrNotFound
+	repo.getArgonConfigErr = appvault.ErrNotFound
 	_, err = service.GetArgonConfig(context.Background(), 7)
 	if err == nil {
 		t.Fatal("expected missing argon config to return an error")
 	}
 
 	appErr := mustVaultAppErr(t, err)
-	if appErr.Code != ErrNotFound.Error() {
+	if appErr.Code != appvault.ErrNotFound.Error() {
 		t.Fatalf("expected not-found code, got %q", appErr.Code)
 	}
 	if appErr.Message != "argon config not found" {
@@ -111,7 +113,7 @@ func TestGetVaultItemsRejectsInvalidType(t *testing.T) {
 	}
 
 	appErr := mustVaultAppErr(t, err)
-	if appErr.Code != ErrVaultType.Error() {
+	if appErr.Code != appvault.ErrVaultType.Error() {
 		t.Fatalf("expected invalid type code, got %q", appErr.Code)
 	}
 }
