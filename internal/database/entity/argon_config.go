@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"lockbox/internal/app/vault"
+	vaultdomain "lockbox/internal/app/vault/domain"
 )
 
 type ArgonConfigEntity struct {
@@ -24,8 +24,8 @@ func (ArgonConfigEntity) TableName() string {
 	return "argon_config"
 }
 
-func (e ArgonConfigEntity) ToDomain() vault.ArgonConfig {
-	return vault.ArgonConfig{
+func (e ArgonConfigEntity) ToDomain() vaultdomain.ArgonConfig {
+	return vaultdomain.ArgonConfig{
 		ID:          e.ID,
 		Iterations:  e.Time,
 		Parallelism: e.Parallelism,

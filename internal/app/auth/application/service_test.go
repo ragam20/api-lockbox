@@ -1,4 +1,4 @@
-package auth
+package application
 
 import (
 	"context"
@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"lockbox/internal"
+	"lockbox/internal/app/auth"
+	"lockbox/internal/app/auth/domain"
 	"lockbox/internal/config"
 	appResponse "lockbox/internal/http/response"
 
@@ -17,7 +19,7 @@ import (
 func TestLoginRejectsInvalidVerifier(t *testing.T) {
 	service := &authService{
 		authRepo: &mockAuthRepo{
-			user: User{
+			user: domain.User{
 				ID:           1,
 				Email:        "user@example.com",
 				AuthVerifier: "correct-verifier",
@@ -35,7 +37,7 @@ func TestLoginRejectsInvalidVerifier(t *testing.T) {
 	}
 
 	appErr := mustAppErr(t, err)
-	if appErr.Code != ErrInvalidCredential.Error() {
+	if appErr.Code != auth.ErrInvalidCredential.Error() {
 		t.Fatalf("expected invalid credential code, got %q", appErr.Code)
 	}
 	if appErr.Message != "invalid credentials" {
@@ -58,7 +60,7 @@ func TestLoginRejectsUnknownUserWithInvalidCredentialCode(t *testing.T) {
 	}
 
 	appErr := mustAppErr(t, err)
-	if appErr.Code != ErrInvalidCredential.Error() {
+	if appErr.Code != auth.ErrInvalidCredential.Error() {
 		t.Fatalf("expected invalid credential code, got %q", appErr.Code)
 	}
 	if appErr.Message != "invalid credentials" {
@@ -74,7 +76,7 @@ func TestRefreshTokenRotatesSessionAndReturnsNewTokens(t *testing.T) {
 	}
 	service := &authService{
 		authRepo: &mockAuthRepo{
-			session: UserSession{
+			session: domain.UserSession{
 				ID:               10,
 				UserID:           1,
 				RefreshTokenHash: internal.HashString("old-refresh-token"),
@@ -111,18 +113,18 @@ func TestRefreshTokenRotatesSessionAndReturnsNewTokens(t *testing.T) {
 }
 
 type mockAuthRepo struct {
-	user             User
+	user             domain.User
 	getByEmailErr    error
 	emailExists      bool
 	emailExistsErr   error
 	createUserErr    error
 	createSessionErr error
-	session          UserSession
+	session          domain.UserSession
 	sessionErr       error
 	updateErr        error
 
-	createdUser      User
-	createdSession   UserSession
+	createdUser      domain.User
+	createdSession   domain.UserSession
 	createdSessionID int64
 
 	updateSessionID int64
@@ -141,14 +143,14 @@ func (r *mockAuthRepo) UpdateAuthVerifier(ctx context.Context, authVerifier stri
 	return nil
 }
 
-func (r *mockAuthRepo) WithTx(tx *gorm.DB) AuthRepository {
+func (r *mockAuthRepo) WithTx(tx *gorm.DB) domain.AuthRepository {
 	r.withTxCalls++
 	return r
 }
 
-func (r *mockAuthRepo) GetByEmail(ctx context.Context, email string) (User, error) {
+func (r *mockAuthRepo) GetByEmail(ctx context.Context, email string) (domain.User, error) {
 	if r.getByEmailErr != nil {
-		return User{}, r.getByEmailErr
+		return domain.User{}, r.getByEmailErr
 	}
 	return r.user, nil
 }
@@ -157,7 +159,7 @@ func (r *mockAuthRepo) EmailExists(ctx context.Context, email string) (bool, err
 	return r.emailExists, r.emailExistsErr
 }
 
-func (r *mockAuthRepo) CreateUser(ctx context.Context, user User) error {
+func (r *mockAuthRepo) CreateUser(ctx context.Context, user domain.User) error {
 	r.createdUser = user
 	return r.createUserErr
 }
@@ -168,19 +170,19 @@ func (r *mockAuthRepo) RevokeSession(ctx context.Context, userID int64, tokenHas
 	return nil
 }
 
-func (r *mockAuthRepo) CreateSession(ctx context.Context, userID int64, userSession UserSession) error {
+func (r *mockAuthRepo) CreateSession(ctx context.Context, userID int64, userSession domain.UserSession) error {
 	r.createdSessionID = userID
 	r.createdSession = userSession
 	r.createdSession.UserID = userID
 	return r.createSessionErr
 }
 
-func (r *mockAuthRepo) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (UserSession, error) {
+func (r *mockAuthRepo) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (domain.UserSession, error) {
 	if r.sessionErr != nil {
-		return UserSession{}, r.sessionErr
+		return domain.UserSession{}, r.sessionErr
 	}
 	if r.session.RefreshTokenHash != refreshTokenHash {
-		return UserSession{}, gorm.ErrRecordNotFound
+		return domain.UserSession{}, gorm.ErrRecordNotFound
 	}
 	return r.session, nil
 }
@@ -210,17 +212,17 @@ type mockTokenManager struct {
 	generateSecureTokenByteSize int
 }
 
-func (m *mockTokenManager) GenerateUserSession(ipAddress, userAgent, device string) (UserSession, error) {
+func (m *mockTokenManager) GenerateUserSession(ipAddress, userAgent, device string) (domain.UserSession, error) {
 	m.generateUserSessionArgs.ipAddress = ipAddress
 	m.generateUserSessionArgs.userAgent = userAgent
 	m.generateUserSessionArgs.device = device
 	if m.generateUserSessionErr != nil {
-		return UserSession{}, m.generateUserSessionErr
+		return domain.UserSession{}, m.generateUserSessionErr
 	}
 	if m.secureToken == "" {
 		m.secureToken = "refresh-token"
 	}
-	return UserSession{
+	return domain.UserSession{
 		ID:               10,
 		RefreshToken:     m.secureToken,
 		RefreshTokenHash: internal.HashString(m.secureToken),
@@ -239,7 +241,7 @@ func (m *mockTokenManager) GenerateAccessToken(userID int64) (string, error) {
 	return m.accessToken, nil
 }
 
-func (m *mockTokenManager) ValidateAccessToken(accessToken string) (*JWTUser, error) {
+func (m *mockTokenManager) ValidateAccessToken(accessToken string) (*auth.JWTUser, error) {
 	return nil, nil
 }
 

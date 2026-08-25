@@ -1,4 +1,4 @@
-package handler
+package helper
 
 import (
 	"strconv"
@@ -59,7 +59,7 @@ func GetPagination(c *gin.Context) (Pagination, error) {
 	}, nil
 }
 
-func archiveQuery(c *gin.Context) (bool, error) {
+func ArchiveQuery(c *gin.Context) (bool, error) {
 	archiveQ := c.Query("archive")
 	if archiveQ == "" {
 		return false, nil
@@ -73,7 +73,7 @@ func archiveQuery(c *gin.Context) (bool, error) {
 	return archive, nil
 }
 
-func favoriteQuery(c *gin.Context) (bool, error) {
+func FavoriteQuery(c *gin.Context) (bool, error) {
 	isFavoriteQ := c.Query("favorite")
 	if isFavoriteQ == "" {
 		return false, nil
@@ -87,7 +87,7 @@ func favoriteQuery(c *gin.Context) (bool, error) {
 	return isFavorite, nil
 }
 
-func userIDFromContext(c *gin.Context) (int64, error) {
+func UserIDFromContext(c *gin.Context) (int64, error) {
 	value, exists := c.Get(constant.UserIDCtx)
 	if !exists {
 		return 0, response.Unauthorized()

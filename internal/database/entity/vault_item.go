@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"lockbox/internal/app/vault"
+	vaultdomain "lockbox/internal/app/vault/domain"
 )
 
 type VaultItemType string
@@ -41,12 +41,12 @@ func (VaultItemEntity) TableName() string {
 	return "vault_items"
 }
 
-func (e VaultItemEntity) ToDomain() vault.VaultItem {
-	return vault.VaultItem{
+func (e VaultItemEntity) ToDomain() vaultdomain.VaultItem {
+	return vaultdomain.VaultItem{
 		ID:              e.ID,
 		VaultID:         e.VaultID,
 		Title:           e.Title,
-		ItemType:        vault.VaultItemType(e.ItemType),
+		ItemType:        vaultdomain.VaultItemType(e.ItemType),
 		IvCiphertext:    e.IvCiphertext,
 		Ciphertext:      e.Ciphertext,
 		IvProtectionKey: e.IvProtectionKey,

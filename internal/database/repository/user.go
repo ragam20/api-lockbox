@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"lockbox/internal/app/user"
+	userdomain "lockbox/internal/app/user/domain"
 	"lockbox/internal/database/entity"
 
 	"gorm.io/gorm"
@@ -14,11 +15,11 @@ type userRepository struct {
 	BaseRepository
 }
 
-func NewUserRepository(db *gorm.DB) user.UserRepository {
+func NewUserRepository(db *gorm.DB) userdomain.UserRepository {
 	return &userRepository{BaseRepository: NewBaseRepository(db)}
 }
 
-func (r *userRepository) RemoveAvatar(ctx context.Context, usr user.User) error {
+func (r *userRepository) RemoveAvatar(ctx context.Context, usr userdomain.User) error {
 	result := r.DB(ctx).Model(&entity.UserEntity{}).Where("id = ?", usr.ID).
 		Updates(map[string]any{
 			"img_url":       usr.ImgURL,
@@ -36,7 +37,7 @@ func (r *userRepository) RemoveAvatar(ctx context.Context, usr user.User) error 
 	return nil
 }
 
-func (r *userRepository) UpdateProfile(ctx context.Context, usr user.User) error {
+func (r *userRepository) UpdateProfile(ctx context.Context, usr userdomain.User) error {
 	result := r.DB(ctx).Model(&entity.UserEntity{}).Where("id = ?", usr.ID).Updates(map[string]any{
 		"name": usr.Name,
 	})
@@ -52,7 +53,7 @@ func (r *userRepository) UpdateProfile(ctx context.Context, usr user.User) error
 	return nil
 }
 
-func (r *userRepository) UpdateAvatar(ctx context.Context, usr user.User) error {
+func (r *userRepository) UpdateAvatar(ctx context.Context, usr userdomain.User) error {
 	result := r.DB(ctx).Model(&entity.UserEntity{}).Where("id = ?", usr.ID).Updates(map[string]any{
 		"public_img_id": usr.PublicImgID,
 		"img_url":       usr.ImgURL,
@@ -69,16 +70,16 @@ func (r *userRepository) UpdateAvatar(ctx context.Context, usr user.User) error 
 	return nil
 }
 
-func (r *userRepository) GetUser(ctx context.Context, userID int64) (user.User, error) {
+func (r *userRepository) GetUser(ctx context.Context, userID int64) (userdomain.User, error) {
 	var e entity.UserEntity
 	if err := r.DB(ctx).Where("id = ?", userID).First(&e).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return user.User{}, user.ErrUserNotFound
+			return userdomain.User{}, user.ErrUserNotFound
 		}
-		return user.User{}, err
+		return userdomain.User{}, err
 	}
 
-	return user.User{
+	return userdomain.User{
 		ID:               e.ID,
 		Name:             e.Name,
 		PublicImgID:      e.PublicImgID,

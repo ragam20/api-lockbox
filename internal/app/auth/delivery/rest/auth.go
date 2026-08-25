@@ -1,13 +1,15 @@
-package handler
+package rest
 
 import (
 	"net/http"
 	"strings"
 	"time"
 
-	"lockbox/internal/app/auth"
+	"lockbox/internal/app/auth/application"
+	"lockbox/internal/app/workflow/registration"
 	"lockbox/internal/config"
 	apphttp "lockbox/internal/http"
+	"lockbox/internal/http/handler/helper"
 	"lockbox/internal/http/request"
 	"lockbox/internal/http/response"
 
@@ -16,20 +18,23 @@ import (
 )
 
 type AuthHandler struct {
-	authService   auth.AuthService
+	authService   application.AuthService
+	registration  registration.Registration
 	cookieManager *apphttp.CookieManager
 	jwtCfg        *config.JWTConfig
 	appConfig     *config.AppConfig
 }
 
 func NewAuthHandler(
-	authService auth.AuthService,
+	authService application.AuthService,
+	registration registration.Registration,
 	cookieManager *apphttp.CookieManager,
 	jwtCfg *config.JWTConfig,
 	appConfig *config.AppConfig,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:   authService,
+		registration:  registration,
 		cookieManager: cookieManager,
 		jwtCfg:        jwtCfg,
 		appConfig:     appConfig,
@@ -59,7 +64,7 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 		return
 	}
 
-	result, err := h.authService.VerifyOTP(c.Request.Context(), auth.VerifyOTPInput{
+	result, err := h.authService.VerifyOTP(c.Request.Context(), application.VerifyOTPInput{
 		Email:     req.Email,
 		OTP:       req.OTP,
 		UserAgent: c.Request.UserAgent(),
@@ -77,7 +82,7 @@ func (h *AuthHandler) VerifyOTP(c *gin.Context) {
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -111,7 +116,7 @@ func (h *AuthHandler) Unlock(c *gin.Context) {
 		return
 	}
 
-	result, err := h.authService.Login(c.Request.Context(), auth.LoginInput{
+	result, err := h.authService.Login(c.Request.Context(), application.LoginInput{
 		Email:    req.Email,
 		Verifier: req.Verifier,
 	})
@@ -164,7 +169,7 @@ func (h *AuthHandler) SendVerifyLink(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.SendVerifyLink(c.Request.Context(), auth.SendVerificationLinkInput{
+	if err := h.authService.SendVerifyLink(c.Request.Context(), application.SendVerificationLinkInput{
 		Email: req.Email,
 	}); err != nil {
 		_ = c.Error(err)
@@ -193,7 +198,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.authService.Register(c.Request.Context(), auth.RegisterInput{
+	user, err := h.registration.Execute(c.Request.Context(), application.RegisterInput{
 		Session:          c.Query("session"),
 		Email:            req.Email,
 		Name:             req.Name,

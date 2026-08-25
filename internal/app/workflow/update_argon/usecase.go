@@ -1,38 +1,38 @@
-package tools
+package updateargon
 
 import (
 	"context"
 
-	"lockbox/internal/app/auth"
 	"lockbox/internal/app/vault"
 	dbtx "lockbox/internal/database/transaction"
 	"lockbox/internal/http/response"
 
+	authdomain "lockbox/internal/app/auth/domain"
+	vaultapp "lockbox/internal/app/vault/application"
+	vaultdomain "lockbox/internal/app/vault/domain"
+
 	"gorm.io/gorm"
 )
 
-type ToolService interface {
-	UpdateArgonConfig(ctx context.Context, input vault.UpdateArgonConfigInput) error
+type UpdateArgonConfig interface {
+	Execute(ctx context.Context, input vaultapp.UpdateArgonConfigInput) error
 }
 
-type toolService struct {
-	authRepo  auth.AuthRepository
-	vaultRepo vault.VaultRepository
+type updateArgonConfig struct {
+	authRepo  authdomain.AuthRepository
+	vaultRepo vaultdomain.VaultRepository
 	txManager dbtx.TransactionManager
 }
 
-func NewToolService(authRepo auth.AuthRepository,
-	vaultRepo vault.VaultRepository,
-	txManager dbtx.TransactionManager,
-) ToolService {
-	return &toolService{
+func NewUpdateArgon(authRepo authdomain.AuthRepository, vaultRepo vaultapp.VaultRepository, txManager dbtx.TransactionManager) UpdateArgonConfig {
+	return &updateArgonConfig{
 		authRepo:  authRepo,
 		vaultRepo: vaultRepo,
 		txManager: txManager,
 	}
 }
 
-func (s *toolService) UpdateArgonConfig(ctx context.Context, input vault.UpdateArgonConfigInput) error {
+func (s *updateArgonConfig) Execute(ctx context.Context, input vaultapp.UpdateArgonConfigInput) error {
 	if err := s.txManager.WithinTransaction(ctx, func(tx *gorm.DB) error {
 		vaultRepo := s.vaultRepo.WithTx(tx)
 		authRepo := s.authRepo.WithTx(tx)

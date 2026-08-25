@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"lockbox/internal/app/auth"
+	"lockbox/internal/app/auth/domain"
 	"lockbox/internal/database/entity"
 
 	"gorm.io/gorm"
@@ -15,11 +16,11 @@ type authRepository struct {
 	BaseRepository
 }
 
-func NewAuthRepository(db *gorm.DB) auth.AuthRepository {
+func NewAuthRepository(db *gorm.DB) domain.AuthRepository {
 	return &authRepository{BaseRepository: NewBaseRepository(db)}
 }
 
-func (r *authRepository) WithTx(tx *gorm.DB) auth.AuthRepository {
+func (r *authRepository) WithTx(tx *gorm.DB) domain.AuthRepository {
 	return &authRepository{BaseRepository: NewBaseRepository(tx)}
 }
 
@@ -52,19 +53,19 @@ func (r *authRepository) EmailExists(ctx context.Context, email string) (bool, e
 	return count > 0, nil
 }
 
-func (r *authRepository) GetByEmail(ctx context.Context, email string) (auth.User, error) {
+func (r *authRepository) GetByEmail(ctx context.Context, email string) (domain.User, error) {
 	var e entity.UserEntity
 	if err := r.DB(ctx).Where("email = ?", email).First(&e).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return auth.User{}, auth.ErrUserNotFound
+			return domain.User{}, auth.ErrUserNotFound
 		}
-		return auth.User{}, err
+		return domain.User{}, err
 	}
 
 	return e.ToDomainUser(), nil
 }
 
-func (r *authRepository) CreateUser(ctx context.Context, user auth.User) error {
+func (r *authRepository) CreateUser(ctx context.Context, user domain.User) error {
 	userEntity := entity.UserEntity{
 		ID:               user.ID,
 		Name:             user.Name,
@@ -95,7 +96,7 @@ func (r *authRepository) RevokeSession(ctx context.Context, userID int64, tokenH
 	return nil
 }
 
-func (r *authRepository) CreateSession(ctx context.Context, userID int64, userSession auth.UserSession) error {
+func (r *authRepository) CreateSession(ctx context.Context, userID int64, userSession domain.UserSession) error {
 	e := entity.UserSessionEntity{
 		ID:               userSession.ID,
 		UserID:           userID,
@@ -114,13 +115,13 @@ func (r *authRepository) CreateSession(ctx context.Context, userID int64, userSe
 	return nil
 }
 
-func (r *authRepository) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (auth.UserSession, error) {
+func (r *authRepository) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (domain.UserSession, error) {
 	var e entity.UserSessionEntity
 	if err := r.DB(ctx).Where("refresh_token_hash = ?", refreshTokenHash).First(&e).Error; err != nil {
-		return auth.UserSession{}, err
+		return domain.UserSession{}, err
 	}
 
-	return auth.UserSession{
+	return domain.UserSession{
 		ID:               e.ID,
 		UserID:           e.UserID,
 		Device:           e.Device,
