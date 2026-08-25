@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"math/big"
@@ -45,7 +44,6 @@ type (
 		GetRegisterSession(ctx context.Context, session string) (response.RegisterSessionResponse, error)
 		SendVerifyLink(ctx context.Context, input SendVerificationLinkInput) error
 		VerifyEmail(ctx context.Context, token string) (string, error)
-		Register(ctx context.Context, input RegisterInput) (*User, error)
 	}
 	authService struct {
 		txManager    dbtx.TransactionManager
@@ -337,130 +335,13 @@ func (s *authService) VerifyEmail(ctx context.Context, token string) (string, er
 	return session, nil
 }
 
-func (s *authService) Register(ctx context.Context, input RegisterInput) (*User, error) {
-	input.Email = normalizeEmail(input.Email)
-	input.Name = strings.TrimSpace(input.Name)
-	input.Session = strings.TrimSpace(input.Session)
-
-	if err := validateRegisterInput(input); err != nil {
-		return nil, err
-	}
-
-	sessionEmail, err := s.cache.Get(ctx, s.tokenManager.RegisterSessionKey(input.Session))
-	if err != nil {
-		if cache.IsMiss(err) {
-			return nil, response.BadRequestError(ErrSessionExpired.Error(), "register session is invalid or expired")
-		}
-		return nil, response.InternalServerError("failed to validate register session")
-	}
-	if sessionEmail != input.Email {
-		return nil, response.ForbiddenError("register session email mismatch")
-	}
-
-	exists, err := s.authRepo.EmailExists(ctx, input.Email)
-	if err != nil {
-		return nil, response.InternalServerError("failed to check email")
-	}
-	if exists {
-		return nil, response.NewAppErr(http.StatusConflict, ErrEmailAlreadyExists.Error(), "email already registered")
-	}
-
-	user := User{
-		ID:               s.idGen.NewID(),
-		Email:            input.Email,
-		Name:             input.Name,
-		MasterKeySalt:    input.MasterKeySalt,
-		AuthVerifier:     input.AuthVerifier,
-		AuthVerifierSalt: input.AuthVerifierSalt,
-		EmailVerified:    true,
-	}
-
-	if err := s.txManager.WithinTransaction(ctx, func(tx *gorm.DB) error {
-		authRepo := s.authRepo.WithTx(tx)
-		vaultRepo := s.vaultRepo.WithTx(tx)
-
-		if err := authRepo.CreateUser(ctx, user); err != nil {
-			return ErrFailedRegister
-		}
-
-		argonConfig := vault.NewDefaultArgonConfig(s.idGen.NewID())
-		if err := vaultRepo.CreateArgonConfig(ctx, argonConfig, user.ID); err != nil {
-			return ErrFailedRegister
-		}
-
-		vaultData := vault.NewDefaultVault(s.idGen.NewID(), input.VaultKeySalt)
-		if err := vaultRepo.CreateVault(ctx, vaultData, user.ID); err != nil {
-			return ErrFailedRegister
-		}
-
-		return nil
-	}); err != nil {
-		if errors.Is(err, ErrFailedRegister) {
-			return nil, response.BadRequestError(ErrFailedRegister.Error(), "failed to register")
-		}
-		return nil, response.InternalServerError(err.Error())
-	}
-
-	_ = s.cache.Del(ctx, s.tokenManager.RegisterSessionKey(input.Session))
-
-	return &user, nil
-}
-
 func (s *authService) verificationLink(token string) string {
 	baseURL := strings.TrimRight(s.appCfg.FrontendURL, "/")
 	return fmt.Sprintf("%s/auth/verify-email?token=%s", baseURL, url.QueryEscape(token))
 }
 
-func validateRegisterInput(input RegisterInput) error {
-	if input.Session == "" {
-		return response.BadRequestError(ErrSessionRequired.Error(), "register session is required")
-	}
-	if input.Email == "" {
-		return response.BadRequestError(ErrFieldEmailRequired.Error(), "email is required")
-	}
-	if input.Name == "" {
-		return response.BadRequestError(ErrFieldNameRequired.Error(), "name is required")
-	}
-
-	base64Fields := map[string]string{
-		"authVerifier":     input.AuthVerifier,
-		"authVerifierSalt": input.AuthVerifierSalt,
-		"masterKeySalt":    input.MasterKeySalt,
-		"vaultKeySalt":     input.VaultKeySalt,
-	}
-	for field, value := range base64Fields {
-		if !isBase64(value) {
-			return response.BadRequestError(ErrValidation.Error(), fmt.Sprintf("%s must be a valid base64 string", field))
-		}
-	}
-
-	return nil
-}
-
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
-}
-
-func isBase64(value string) bool {
-	value = strings.TrimSpace(value)
-	if value == "" {
-		return false
-	}
-
-	encodings := []*base64.Encoding{
-		base64.StdEncoding,
-		base64.RawStdEncoding,
-		base64.URLEncoding,
-		base64.RawURLEncoding,
-	}
-
-	for _, encoding := range encodings {
-		if _, err := encoding.DecodeString(value); err == nil {
-			return true
-		}
-	}
-
-	return false
 }
 
 func generateOTP() (string, error) {

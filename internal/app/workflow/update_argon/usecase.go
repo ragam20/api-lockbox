@@ -1,4 +1,4 @@
-package tools
+package updateargon
 
 import (
 	"context"
@@ -11,28 +11,25 @@ import (
 	"gorm.io/gorm"
 )
 
-type ToolService interface {
-	UpdateArgonConfig(ctx context.Context, input vault.UpdateArgonConfigInput) error
+type UpdateArgonConfig interface {
+	Execute(ctx context.Context, input vault.UpdateArgonConfigInput) error
 }
 
-type toolService struct {
+type updateArgonConfig struct {
 	authRepo  auth.AuthRepository
 	vaultRepo vault.VaultRepository
 	txManager dbtx.TransactionManager
 }
 
-func NewToolService(authRepo auth.AuthRepository,
-	vaultRepo vault.VaultRepository,
-	txManager dbtx.TransactionManager,
-) ToolService {
-	return &toolService{
+func NewUpdateArgon(authRepo auth.AuthRepository, vaultRepo vault.VaultRepository, txManager dbtx.TransactionManager) UpdateArgonConfig {
+	return &updateArgonConfig{
 		authRepo:  authRepo,
 		vaultRepo: vaultRepo,
 		txManager: txManager,
 	}
 }
 
-func (s *toolService) UpdateArgonConfig(ctx context.Context, input vault.UpdateArgonConfigInput) error {
+func (s *updateArgonConfig) Execute(ctx context.Context, input vault.UpdateArgonConfigInput) error {
 	if err := s.txManager.WithinTransaction(ctx, func(tx *gorm.DB) error {
 		vaultRepo := s.vaultRepo.WithTx(tx)
 		authRepo := s.authRepo.WithTx(tx)
