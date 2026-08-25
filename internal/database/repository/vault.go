@@ -7,7 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"lockbox/internal/app/vault"
+	appvault "lockbox/internal/app/vault"
+	vaultdomain "lockbox/internal/app/vault/domain"
 	"lockbox/internal/database/entity"
 
 	"gorm.io/gorm"
@@ -17,15 +18,15 @@ type vaultRepository struct {
 	BaseRepository
 }
 
-func NewVaultRepository(db *gorm.DB) vault.VaultRepository {
+func NewVaultRepository(db *gorm.DB) vaultdomain.VaultRepository {
 	return &vaultRepository{BaseRepository: BaseRepository{db}}
 }
 
-func (r *vaultRepository) WithTx(tx *gorm.DB) vault.VaultRepository {
+func (r *vaultRepository) WithTx(tx *gorm.DB) vaultdomain.VaultRepository {
 	return &vaultRepository{BaseRepository: BaseRepository{tx}}
 }
 
-func (r *vaultRepository) UpdateArgonConfig(ctx context.Context, argonConfig vault.ArgonConfig) error {
+func (r *vaultRepository) UpdateArgonConfig(ctx context.Context, argonConfig vaultdomain.ArgonConfig) error {
 	result := r.DB(ctx).
 		Model(&entity.ArgonConfigEntity{}).
 		Where("id = ?", argonConfig.ID).
@@ -40,13 +41,13 @@ func (r *vaultRepository) UpdateArgonConfig(ctx context.Context, argonConfig vau
 	}
 
 	if result.RowsAffected == 0 {
-		return vault.ErrNotFound
+		return appvault.ErrNotFound
 	}
 
 	return nil
 }
 
-func (r *vaultRepository) UpdateProtectionKeys(ctx context.Context, keys []vault.ItemProtectionKey) error {
+func (r *vaultRepository) UpdateProtectionKeys(ctx context.Context, keys []vaultdomain.ItemProtectionKey) error {
 	if len(keys) == 0 {
 		return nil
 	}
@@ -68,7 +69,7 @@ func (r *vaultRepository) UpdateProtectionKeys(ctx context.Context, keys []vault
 
 func updateProtectionKeysBatch(
 	tx *gorm.DB,
-	keys []vault.ItemProtectionKey,
+	keys []vaultdomain.ItemProtectionKey,
 ) error {
 	var (
 		ids              = make([]int64, 0, len(keys))
@@ -120,7 +121,7 @@ func updateProtectionKeysBatch(
 	return tx.Exec(query, args...).Error
 }
 
-func (r *vaultRepository) GetProtectionKeys(ctx context.Context, userID int64) ([]vault.ItemProtectionKey, error) {
+func (r *vaultRepository) GetProtectionKeys(ctx context.Context, userID int64) ([]vaultdomain.ItemProtectionKey, error) {
 	var e []entity.VaultItemEntity
 	err := r.DB(ctx).
 		Model(&entity.VaultItemEntity{}).
@@ -130,13 +131,13 @@ func (r *vaultRepository) GetProtectionKeys(ctx context.Context, userID int64) (
 		Find(&e).
 		Error
 	if err != nil {
-		return []vault.ItemProtectionKey{}, nil
+		return []vaultdomain.ItemProtectionKey{}, nil
 	}
 
-	result := make([]vault.ItemProtectionKey, len(e))
+	result := make([]vaultdomain.ItemProtectionKey, len(e))
 
 	for i, v := range e {
-		result[i] = vault.ItemProtectionKey{
+		result[i] = vaultdomain.ItemProtectionKey{
 			ID:              v.ID,
 			ProtectionKey:   v.ProtectionKey,
 			IvProtectionKey: v.IvProtectionKey,
@@ -152,14 +153,14 @@ func (r *vaultRepository) SetFavorite(ctx context.Context, itemID int64) error {
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return vault.ErrNotFound
+			return appvault.ErrNotFound
 		}
 
 		return result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return vault.ErrNotFound
+		return appvault.ErrNotFound
 	}
 
 	return nil
@@ -172,48 +173,48 @@ func (r *vaultRepository) DeleteFavorite(ctx context.Context, itemID int64) erro
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return vault.ErrNotFound
+			return appvault.ErrNotFound
 		}
 
 		return result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return vault.ErrNotFound
+		return appvault.ErrNotFound
 	}
 
 	return nil
 }
 
-func (r *vaultRepository) GetVault(ctx context.Context, userID int64) (vault.Vault, error) {
+func (r *vaultRepository) GetVault(ctx context.Context, userID int64) (vaultdomain.Vault, error) {
 	var e entity.VaultEntity
 	if err := r.DB(ctx).Where("user_id = ?", userID).First(&e).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return vault.Vault{}, vault.ErrNotFound
+			return vaultdomain.Vault{}, appvault.ErrNotFound
 		}
-		return vault.Vault{}, err
+		return vaultdomain.Vault{}, err
 	}
 
-	return vault.Vault{
+	return vaultdomain.Vault{
 		ID:           e.ID,
 		Timeout:      e.Timeout,
-		TimeoutType:  vault.VaultTimeoutType(e.TimeoutType),
+		TimeoutType:  vaultdomain.VaultTimeoutType(e.TimeoutType),
 		VaultKeySalt: e.VaultKeySalt,
 		CreatedAt:    e.CreatedAt,
 		UpdatedAt:    e.UpdatedAt,
 	}, nil
 }
 
-func (r *vaultRepository) GetArgonConfig(ctx context.Context, userID int64) (vault.ArgonConfig, error) {
+func (r *vaultRepository) GetArgonConfig(ctx context.Context, userID int64) (vaultdomain.ArgonConfig, error) {
 	var e entity.ArgonConfigEntity
 	if err := r.DB(ctx).Where("user_id = ?", userID).First(&e).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return vault.ArgonConfig{}, vault.ErrNotFound
+			return vaultdomain.ArgonConfig{}, appvault.ErrNotFound
 		}
-		return vault.ArgonConfig{}, err
+		return vaultdomain.ArgonConfig{}, err
 	}
 
-	return vault.ArgonConfig{
+	return vaultdomain.ArgonConfig{
 		ID:          e.ID,
 		Iterations:  e.Time,
 		Memory:      e.Memory,
@@ -223,25 +224,25 @@ func (r *vaultRepository) GetArgonConfig(ctx context.Context, userID int64) (vau
 	}, nil
 }
 
-func (r *vaultRepository) GetVaultByUserID(ctx context.Context, userID int64) (vault.Vault, error) {
+func (r *vaultRepository) GetVaultByUserID(ctx context.Context, userID int64) (vaultdomain.Vault, error) {
 	var e entity.VaultEntity
 	if err := r.DB(ctx).Where("user_id = ?", userID).First(&e).Error; err != nil {
-		return vault.Vault{}, err
+		return vaultdomain.Vault{}, err
 	}
 
 	return e.ToDomain(), nil
 }
 
-func (r *vaultRepository) GetConfigByUserID(ctx context.Context, userID int64) (vault.ArgonConfig, error) {
+func (r *vaultRepository) GetConfigByUserID(ctx context.Context, userID int64) (vaultdomain.ArgonConfig, error) {
 	var e entity.ArgonConfigEntity
 	if err := r.DB(ctx).Where("user_id = ?", userID).First(&e).Error; err != nil {
-		return vault.ArgonConfig{}, err
+		return vaultdomain.ArgonConfig{}, err
 	}
 
 	return e.ToDomain(), nil
 }
 
-func (r *vaultRepository) CreateArgonConfig(ctx context.Context, argonConfig vault.ArgonConfig, userID int64) error {
+func (r *vaultRepository) CreateArgonConfig(ctx context.Context, argonConfig vaultdomain.ArgonConfig, userID int64) error {
 	argonEntity := entity.ArgonConfigEntity{
 		ID:          argonConfig.ID,
 		UserID:      userID,
@@ -253,7 +254,7 @@ func (r *vaultRepository) CreateArgonConfig(ctx context.Context, argonConfig vau
 	return r.DB(ctx).Create(&argonEntity).Error
 }
 
-func (r *vaultRepository) CreateVault(ctx context.Context, vault vault.Vault, userID int64) error {
+func (r *vaultRepository) CreateVault(ctx context.Context, vault vaultdomain.Vault, userID int64) error {
 	vaultEntity := entity.VaultEntity{
 		ID:           vault.ID,
 		UserID:       userID,
@@ -265,15 +266,15 @@ func (r *vaultRepository) CreateVault(ctx context.Context, vault vault.Vault, us
 	return r.DB(ctx).Create(&vaultEntity).Error
 }
 
-func (r *vaultRepository) GetVaultItems(ctx context.Context, input vault.GetVaultInput) (vault.GetVaultItemsResult, error) {
+func (r *vaultRepository) GetVaultItems(ctx context.Context, input vaultdomain.GetVaultInput) (vaultdomain.GetVaultItemsResult, error) {
 	return r.listVaultItems(ctx, input, false)
 }
 
-func (r *vaultRepository) GetFavorites(ctx context.Context, input vault.GetVaultInput) (vault.GetVaultItemsResult, error) {
+func (r *vaultRepository) GetFavorites(ctx context.Context, input vaultdomain.GetVaultInput) (vaultdomain.GetVaultItemsResult, error) {
 	return r.listVaultItems(ctx, input, true)
 }
 
-func (r *vaultRepository) listVaultItems(ctx context.Context, input vault.GetVaultInput, favoritesOnly bool) (vault.GetVaultItemsResult, error) {
+func (r *vaultRepository) listVaultItems(ctx context.Context, input vaultdomain.GetVaultInput, favoritesOnly bool) (vaultdomain.GetVaultItemsResult, error) {
 	var e []entity.VaultItemEntity
 
 	archivedClause := "vault_items.archived_at IS NULL"
@@ -300,7 +301,7 @@ func (r *vaultRepository) listVaultItems(ctx context.Context, input vault.GetVau
 	countDB := db.Session(&gorm.Session{})
 	var totalItems int64
 	if err := countDB.Model(&entity.VaultItemEntity{}).Count(&totalItems).Error; err != nil {
-		return vault.GetVaultItemsResult{}, err
+		return vaultdomain.GetVaultItemsResult{}, err
 	}
 
 	field, order := input.Query.ParseOrder()
@@ -310,21 +311,21 @@ func (r *vaultRepository) listVaultItems(ctx context.Context, input vault.GetVau
 		Order(fmt.Sprintf("%s %s", field, order))
 
 	if err := db.Find(&e).Error; err != nil {
-		return vault.GetVaultItemsResult{}, err
+		return vaultdomain.GetVaultItemsResult{}, err
 	}
 
-	domain := make([]vault.VaultItem, len(e))
+	domain := make([]vaultdomain.VaultItem, len(e))
 	for i, item := range e {
 		domain[i] = item.ToDomain()
 	}
 
-	return vault.GetVaultItemsResult{
+	return vaultdomain.GetVaultItemsResult{
 		Items:      domain,
 		TotalItems: totalItems,
 	}, nil
 }
 
-func (r *vaultRepository) CreateVaultItem(ctx context.Context, item vault.VaultItem) error {
+func (r *vaultRepository) CreateVaultItem(ctx context.Context, item vaultdomain.VaultItem) error {
 	itemEntity := entity.VaultItemEntity{
 		ID:              item.ID,
 		VaultID:         item.VaultID,
@@ -339,7 +340,7 @@ func (r *vaultRepository) CreateVaultItem(ctx context.Context, item vault.VaultI
 	return r.DB(ctx).Create(&itemEntity).Error
 }
 
-func (r *vaultRepository) GetVaultItemByID(ctx context.Context, input vault.GetVaultItemByIDInput) (vault.VaultItem, error) {
+func (r *vaultRepository) GetVaultItemByID(ctx context.Context, input vaultdomain.GetVaultItemByIDInput) (vaultdomain.VaultItem, error) {
 	var e entity.VaultItemEntity
 
 	archivedClause := "vault_items.archived_at IS NULL"
@@ -351,13 +352,13 @@ func (r *vaultRepository) GetVaultItemByID(ctx context.Context, input vault.GetV
 		Joins("JOIN vaults ON vaults.id = vault_items.vault_id").
 		Where("vault_items.id = ? AND vaults.user_id = ? AND vault_items.deleted_at IS NULL AND "+archivedClause, input.ItemID, input.UserID).
 		First(&e).Error; err != nil {
-		return vault.VaultItem{}, err
+		return vaultdomain.VaultItem{}, err
 	}
 
 	return e.ToDomain(), nil
 }
 
-func (r *vaultRepository) ArchiveVaultItem(ctx context.Context, item vault.VaultItem) error {
+func (r *vaultRepository) ArchiveVaultItem(ctx context.Context, item vaultdomain.VaultItem) error {
 	result := r.DB(ctx).
 		Model(&entity.VaultItemEntity{}).
 		Where("id = ? AND vault_id = ? AND deleted_at IS NULL AND archived_at IS NULL", item.ID, item.VaultID).
@@ -372,7 +373,7 @@ func (r *vaultRepository) ArchiveVaultItem(ctx context.Context, item vault.Vault
 	return nil
 }
 
-func (r *vaultRepository) UnarchiveVaultItem(ctx context.Context, item vault.VaultItem) error {
+func (r *vaultRepository) UnarchiveVaultItem(ctx context.Context, item vaultdomain.VaultItem) error {
 	result := r.DB(ctx).
 		Model(&entity.VaultItemEntity{}).
 		Where("id = ? AND vault_id = ? AND deleted_at IS NULL AND archived_at IS NOT NULL", item.ID, item.VaultID).
@@ -387,7 +388,7 @@ func (r *vaultRepository) UnarchiveVaultItem(ctx context.Context, item vault.Vau
 	return nil
 }
 
-func (r *vaultRepository) UpdateVaultItem(ctx context.Context, item vault.VaultItem) error {
+func (r *vaultRepository) UpdateVaultItem(ctx context.Context, item vaultdomain.VaultItem) error {
 	result := r.DB(ctx).
 		Model(&entity.VaultItemEntity{}).
 		Where("id = ? AND vault_id = ? AND deleted_at IS NULL", item.ID, item.VaultID).

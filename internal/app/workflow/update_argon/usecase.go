@@ -8,21 +8,23 @@ import (
 	"lockbox/internal/http/response"
 
 	authdomain "lockbox/internal/app/auth/domain"
+	vaultapp "lockbox/internal/app/vault/application"
+	vaultdomain "lockbox/internal/app/vault/domain"
 
 	"gorm.io/gorm"
 )
 
 type UpdateArgonConfig interface {
-	Execute(ctx context.Context, input vault.UpdateArgonConfigInput) error
+	Execute(ctx context.Context, input vaultapp.UpdateArgonConfigInput) error
 }
 
 type updateArgonConfig struct {
 	authRepo  authdomain.AuthRepository
-	vaultRepo vault.VaultRepository
+	vaultRepo vaultdomain.VaultRepository
 	txManager dbtx.TransactionManager
 }
 
-func NewUpdateArgon(authRepo authdomain.AuthRepository, vaultRepo vault.VaultRepository, txManager dbtx.TransactionManager) UpdateArgonConfig {
+func NewUpdateArgon(authRepo authdomain.AuthRepository, vaultRepo vaultapp.VaultRepository, txManager dbtx.TransactionManager) UpdateArgonConfig {
 	return &updateArgonConfig{
 		authRepo:  authRepo,
 		vaultRepo: vaultRepo,
@@ -30,7 +32,7 @@ func NewUpdateArgon(authRepo authdomain.AuthRepository, vaultRepo vault.VaultRep
 	}
 }
 
-func (s *updateArgonConfig) Execute(ctx context.Context, input vault.UpdateArgonConfigInput) error {
+func (s *updateArgonConfig) Execute(ctx context.Context, input vaultapp.UpdateArgonConfigInput) error {
 	if err := s.txManager.WithinTransaction(ctx, func(tx *gorm.DB) error {
 		vaultRepo := s.vaultRepo.WithTx(tx)
 		authRepo := s.authRepo.WithTx(tx)

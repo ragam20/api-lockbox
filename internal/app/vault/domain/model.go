@@ -1,8 +1,16 @@
-package vault
+package domain
 
 import (
 	"strings"
 	"time"
+)
+
+const (
+	defaultArgonMemory      = 64 * 1024
+	defaultArgonIterations  = 3
+	defaultArgonParallelism = 3
+	defaultVaultTimeout     = 10
+	defaultVaultTimeoutType = VaultTimeoutTypeLock
 )
 
 type VaultTimeoutType string
@@ -73,25 +81,18 @@ func NewDefaultArgonConfig(id int64) ArgonConfig {
 	}
 }
 
-type CreateVaultItemInput struct {
-	UserID          int64
-	Title           string
-	ItemType        VaultItemType
-	IvCiphertext    string
-	Ciphertext      string
+type ItemProtectionKey struct {
+	ID              int64
 	IvProtectionKey string
 	ProtectionKey   string
 }
 
-type UpdateVaultItemInput struct {
-	UserID          int64
-	ItemID          int64
-	Title           string
-	ItemType        VaultItemType
-	IvCiphertext    string
-	Ciphertext      string
-	IvProtectionKey string
-	ProtectionKey   string
+func (t VaultItemType) IsValid() bool {
+	switch t {
+	case VaultItemTypePassword, VaultItemTypeNote, VaultItemTypeAPIKey:
+		return true
+	}
+	return false
 }
 
 type GetVaultInput struct {
@@ -120,52 +121,20 @@ type VaultItemQuery struct {
 }
 
 func (f *VaultItemQuery) ParseOrder() (string, string) {
-	allowedFields := map[string]string{
-		"title":      "title",
-		"created_at": "created_at",
-	}
-
-	allowedOrders := map[string]bool{
-		"desc": true,
-		"asc":  true,
-	}
-
+	allowedFields := map[string]string{"title": "title", "created_at": "created_at"}
+	allowedOrders := map[string]bool{"desc": true, "asc": true}
 	s := strings.Split(strings.TrimSpace(f.SortBy), ",")
 	if len(s) != 2 {
 		return "created_at", "desc"
 	}
-
 	field := strings.TrimSpace(s[0])
 	order := strings.TrimSpace(s[1])
-
 	column, ok := allowedFields[field]
 	if !ok {
 		column = "created_at"
 	}
-
 	if !allowedOrders[order] {
 		order = "desc"
 	}
-
 	return column, order
-}
-
-func CheckVaultType(vaultType string) bool {
-	return vaultType == string(VaultItemTypeNote) ||
-		vaultType == string(VaultItemTypePassword) ||
-		vaultType == string(VaultItemTypeAPIKey) ||
-		vaultType == string(VaultItemTypeAll)
-}
-
-type ItemProtectionKey struct {
-	ID              int64
-	IvProtectionKey string
-	ProtectionKey   string
-}
-
-type UpdateArgonConfigInput struct {
-	UserID         int64
-	AuthVerifier   string
-	ArgonConfig    ArgonConfig
-	ProtectionKeys []ItemProtectionKey
 }

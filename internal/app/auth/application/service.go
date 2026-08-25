@@ -14,7 +14,6 @@ import (
 	"lockbox/internal"
 	"lockbox/internal/app/auth"
 	"lockbox/internal/app/auth/domain"
-	"lockbox/internal/app/vault"
 	"lockbox/internal/cache"
 	"lockbox/internal/config"
 	dbtx "lockbox/internal/database/transaction"
@@ -50,7 +49,6 @@ type (
 	authService struct {
 		txManager    dbtx.TransactionManager
 		authRepo     domain.AuthRepository
-		vaultRepo    vault.VaultRepository
 		cache        cache.Store
 		mail         smtp.MailService
 		appCfg       *config.AppConfig
@@ -63,7 +61,6 @@ type (
 func NewAuthService(
 	txManager dbtx.TransactionManager,
 	authRepo domain.AuthRepository,
-	vaultRepo vault.VaultRepository,
 	cache cache.Store,
 	mail smtp.MailService,
 	appCfg *config.AppConfig,
@@ -74,7 +71,6 @@ func NewAuthService(
 	return &authService{
 		txManager:    txManager,
 		authRepo:     authRepo,
-		vaultRepo:    vaultRepo,
 		cache:        cache,
 		mail:         mail,
 		appCfg:       appCfg,

@@ -1,12 +1,15 @@
-package handler
+package rest
 
 import (
 	"net/http"
 	"strconv"
 
-	"lockbox/internal/app/vault"
+	appvault "lockbox/internal/app/vault"
+	vaultapp "lockbox/internal/app/vault/application"
+	vaultdomain "lockbox/internal/app/vault/domain"
 	argonconfig "lockbox/internal/app/workflow/update_argon"
 	apphttp "lockbox/internal/http"
+	"lockbox/internal/http/handler/helper"
 	"lockbox/internal/http/request"
 	"lockbox/internal/http/response"
 
@@ -14,16 +17,16 @@ import (
 )
 
 type VaultHandler struct {
-	vaultService      vault.VaultService
+	vaultService      vaultapp.VaultService
 	updateArgonConfig argonconfig.UpdateArgonConfig
 }
 
-func NewVaultHandler(vaultService vault.VaultService, updateArgonConfig argonconfig.UpdateArgonConfig) *VaultHandler {
+func NewVaultHandler(vaultService vaultapp.VaultService, updateArgonConfig argonconfig.UpdateArgonConfig) *VaultHandler {
 	return &VaultHandler{vaultService: vaultService, updateArgonConfig: updateArgonConfig}
 }
 
 func (h *VaultHandler) UpdateArgonConfig(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -35,9 +38,9 @@ func (h *VaultHandler) UpdateArgonConfig(c *gin.Context) {
 		return
 	}
 
-	protectionKeys := make([]vault.ItemProtectionKey, 0, len(req.ProtectionKeys))
+	protectionKeys := make([]vaultdomain.ItemProtectionKey, 0, len(req.ProtectionKeys))
 	for _, v := range req.ProtectionKeys {
-		protectionKeys = append(protectionKeys, vault.ItemProtectionKey{
+		protectionKeys = append(protectionKeys, vaultdomain.ItemProtectionKey{
 			ID:              v.ItemID,
 			IvProtectionKey: v.IvProtectionKey,
 			ProtectionKey:   v.ProtectionKey,
@@ -46,10 +49,10 @@ func (h *VaultHandler) UpdateArgonConfig(c *gin.Context) {
 
 	err = h.updateArgonConfig.Execute(
 		c.Request.Context(),
-		vault.UpdateArgonConfigInput{
+		vaultapp.UpdateArgonConfigInput{
 			UserID:       userID,
 			AuthVerifier: req.AuthVerifier,
-			ArgonConfig: vault.ArgonConfig{
+			ArgonConfig: vaultdomain.ArgonConfig{
 				ID:          req.ArgonConfig.ID,
 				Iterations:  uint32(req.ArgonConfig.Iterations),
 				Memory:      uint32(req.ArgonConfig.Memory),
@@ -67,7 +70,7 @@ func (h *VaultHandler) UpdateArgonConfig(c *gin.Context) {
 }
 
 func (h *VaultHandler) GetProtectionKeys(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -92,7 +95,7 @@ func (h *VaultHandler) GetProtectionKeys(c *gin.Context) {
 }
 
 func (h *VaultHandler) SetFavorite(c *gin.Context) {
-	_, err := userIDFromContext(c)
+	_, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -113,7 +116,7 @@ func (h *VaultHandler) SetFavorite(c *gin.Context) {
 }
 
 func (h *VaultHandler) DeleteFavorite(c *gin.Context) {
-	_, err := userIDFromContext(c)
+	_, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -134,7 +137,7 @@ func (h *VaultHandler) DeleteFavorite(c *gin.Context) {
 }
 
 func (h *VaultHandler) GetVault(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -157,7 +160,7 @@ func (h *VaultHandler) GetVault(c *gin.Context) {
 }
 
 func (h *VaultHandler) GetArgonConfig(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -180,31 +183,31 @@ func (h *VaultHandler) GetArgonConfig(c *gin.Context) {
 }
 
 func (h *VaultHandler) GetVaultItems(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	pagination, err := GetPagination(c)
+	pagination, err := helper.GetPagination(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
 	vaultType := c.Query("type")
-	if !vault.CheckVaultType(vaultType) {
-		_ = c.Error(response.BadRequestError(vault.ErrVaultType.Error(), "vault type must be password or note"))
+	if !vaultapp.CheckVaultType(vaultType) {
+		_ = c.Error(response.BadRequestError(appvault.ErrVaultType.Error(), "vault type must be password or note"))
 		return
 	}
 
-	archive, err := archiveQuery(c)
+	archive, err := helper.ArchiveQuery(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
-	resp, err := h.vaultService.GetVaultItems(c.Request.Context(), vault.GetVaultInput{
-		Query: vault.VaultItemQuery{
+	resp, err := h.vaultService.GetVaultItems(c.Request.Context(), vaultapp.GetVaultInput{
+		Query: vaultapp.VaultItemQuery{
 			Page:   pagination.Page,
 			Limit:  pagination.Limit,
 			SortBy: c.Query("sortBy"),
@@ -240,13 +243,13 @@ func (h *VaultHandler) GetVaultItems(c *gin.Context) {
 }
 
 func (h *VaultHandler) GetFavorites(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	pagination, err := GetPagination(c)
+	pagination, err := helper.GetPagination(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -254,21 +257,21 @@ func (h *VaultHandler) GetFavorites(c *gin.Context) {
 
 	vaultType := c.Query("type")
 	if vaultType == "" {
-		vaultType = string(vault.VaultItemTypeAll)
+		vaultType = string(vaultapp.VaultItemTypeAll)
 	}
-	if !vault.CheckVaultType(vaultType) {
-		_ = c.Error(response.BadRequestError(vault.ErrVaultType.Error(), "vault type must be password or note"))
+	if !vaultapp.CheckVaultType(vaultType) {
+		_ = c.Error(response.BadRequestError(appvault.ErrVaultType.Error(), "vault type must be password or note"))
 		return
 	}
 
-	archive, err := archiveQuery(c)
+	archive, err := helper.ArchiveQuery(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	resp, err := h.vaultService.GetFavorites(c.Request.Context(), vault.GetVaultInput{
-		Query: vault.VaultItemQuery{
+	resp, err := h.vaultService.GetFavorites(c.Request.Context(), vaultapp.GetVaultInput{
+		Query: vaultapp.VaultItemQuery{
 			Page:   pagination.Page,
 			Limit:  pagination.Limit,
 			SortBy: c.Query("sortBy"),
@@ -304,7 +307,7 @@ func (h *VaultHandler) GetFavorites(c *gin.Context) {
 }
 
 func (h *VaultHandler) GetVaultItemByID(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -316,13 +319,13 @@ func (h *VaultHandler) GetVaultItemByID(c *gin.Context) {
 		return
 	}
 
-	archive, err := archiveQuery(c)
+	archive, err := helper.ArchiveQuery(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	item, err := h.vaultService.GetVaultItemByID(c.Request.Context(), vault.GetVaultItemByIDInput{
+	item, err := h.vaultService.GetVaultItemByID(c.Request.Context(), vaultapp.GetVaultItemByIDInput{
 		UserID:   userID,
 		ItemID:   itemID,
 		Archived: archive,
@@ -342,16 +345,16 @@ func (h *VaultHandler) CreateVaultItem(c *gin.Context) {
 		return
 	}
 
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	item, err := h.vaultService.CreateVaultItem(c.Request.Context(), vault.CreateVaultItemInput{
+	item, err := h.vaultService.CreateVaultItem(c.Request.Context(), vaultapp.CreateVaultItemInput{
 		UserID:          userID,
 		Title:           req.Title,
-		ItemType:        vault.VaultItemType(req.ItemType),
+		ItemType:        vaultdomain.VaultItemType(req.ItemType),
 		IvCiphertext:    req.IvCiphertext,
 		Ciphertext:      req.Ciphertext,
 		IvProtectionKey: req.IvProtectionKey,
@@ -372,7 +375,7 @@ func (h *VaultHandler) UpdateVaultItem(c *gin.Context) {
 		return
 	}
 
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -384,11 +387,11 @@ func (h *VaultHandler) UpdateVaultItem(c *gin.Context) {
 		return
 	}
 
-	item, err := h.vaultService.UpdateVaultItem(c.Request.Context(), vault.UpdateVaultItemInput{
+	item, err := h.vaultService.UpdateVaultItem(c.Request.Context(), vaultapp.UpdateVaultItemInput{
 		UserID:          userID,
 		ItemID:          itemID,
 		Title:           req.Title,
-		ItemType:        vault.VaultItemType(req.ItemType),
+		ItemType:        vaultdomain.VaultItemType(req.ItemType),
 		IvCiphertext:    req.IvCiphertext,
 		Ciphertext:      req.Ciphertext,
 		IvProtectionKey: req.IvProtectionKey,
@@ -403,7 +406,7 @@ func (h *VaultHandler) UpdateVaultItem(c *gin.Context) {
 }
 
 func (h *VaultHandler) ArchiveVaultItem(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -425,7 +428,7 @@ func (h *VaultHandler) ArchiveVaultItem(c *gin.Context) {
 }
 
 func (h *VaultHandler) UnarchiveVaultItem(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -447,7 +450,7 @@ func (h *VaultHandler) UnarchiveVaultItem(c *gin.Context) {
 }
 
 func (h *VaultHandler) DeleteVaultItem(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(err)
 		return
@@ -476,7 +479,7 @@ func vaultItemIDFromParam(c *gin.Context) (int64, error) {
 	return itemID, nil
 }
 
-func vaultItemResponse(item vault.VaultItem) response.VaultItemResponse {
+func vaultItemResponse(item vaultdomain.VaultItem) response.VaultItemResponse {
 	return response.VaultItemResponse{
 		ID:              item.ID,
 		VaultID:         item.VaultID,
@@ -493,7 +496,7 @@ func vaultItemResponse(item vault.VaultItem) response.VaultItemResponse {
 	}
 }
 
-func vaultItemsResponse(items []vault.VaultItem) []response.VaultItemResponse {
+func vaultItemsResponse(items []vaultdomain.VaultItem) []response.VaultItemResponse {
 	res := make([]response.VaultItemResponse, len(items))
 	for i, item := range items {
 		res[i] = vaultItemResponse(item)

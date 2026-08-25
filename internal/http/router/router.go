@@ -6,6 +6,7 @@ import (
 
 	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/handler"
+
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/response"
 

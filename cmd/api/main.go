@@ -11,7 +11,8 @@ import (
 	userapp "lockbox/internal/app/user/application"
 	userrest "lockbox/internal/app/user/delivery/rest"
 
-	"lockbox/internal/app/vault"
+	vaultapp "lockbox/internal/app/vault/application"
+	vaultrest "lockbox/internal/app/vault/delivery/rest"
 
 	"lockbox/internal/app/workflow/registration"
 	updateargon "lockbox/internal/app/workflow/update_argon"
@@ -21,7 +22,6 @@ import (
 	"lockbox/internal/database/repository"
 	dbtx "lockbox/internal/database/transaction"
 	appHttp "lockbox/internal/http"
-	"lockbox/internal/http/handler"
 	"lockbox/internal/http/middleware"
 	"lockbox/internal/http/router"
 	"lockbox/internal/http/server"
@@ -92,8 +92,8 @@ func main() {
 	vaultModule := fx.Module(
 		"vault",
 		fx.Provide(
-			vault.NewVaultService,
-			handler.NewVaultHandler,
+			vaultapp.NewVaultService,
+			vaultrest.NewVaultHandler,
 		),
 	)
 

@@ -11,7 +11,8 @@ import (
 	"lockbox/internal/app/auth"
 	authapp "lockbox/internal/app/auth/application"
 	authdomain "lockbox/internal/app/auth/domain"
-	"lockbox/internal/app/vault"
+	vaultdomain "lockbox/internal/app/vault/domain"
+
 	"lockbox/internal/cache"
 	dbtx "lockbox/internal/database/transaction"
 	"lockbox/internal/http/response"
@@ -27,7 +28,7 @@ type Registration interface {
 type registration struct {
 	txManager    dbtx.TransactionManager
 	authRepo     authdomain.AuthRepository
-	vaultRepo    vault.VaultRepository
+	vaultRepo    vaultdomain.VaultRepository
 	cache        cache.Store
 	idGen        idgen.IDGenerator
 	tokenManager auth.TokenManager
@@ -36,7 +37,7 @@ type registration struct {
 func NewRegistration(
 	txManager dbtx.TransactionManager,
 	authRepo authdomain.AuthRepository,
-	vaultRepo vault.VaultRepository,
+	vaultRepo vaultdomain.VaultRepository,
 	cache cache.Store,
 	idGen idgen.IDGenerator,
 	tokenManager auth.TokenManager,
@@ -97,12 +98,12 @@ func (s *registration) Execute(ctx context.Context, input authapp.RegisterInput)
 			return auth.ErrFailedRegister
 		}
 
-		argonConfig := vault.NewDefaultArgonConfig(s.idGen.NewID())
+		argonConfig := vaultdomain.NewDefaultArgonConfig(s.idGen.NewID())
 		if err := vaultRepo.CreateArgonConfig(ctx, argonConfig, user.ID); err != nil {
 			return auth.ErrFailedRegister
 		}
 
-		vaultData := vault.NewDefaultVault(s.idGen.NewID(), input.VaultKeySalt)
+		vaultData := vaultdomain.NewDefaultVault(s.idGen.NewID(), input.VaultKeySalt)
 		if err := vaultRepo.CreateVault(ctx, vaultData, user.ID); err != nil {
 			return auth.ErrFailedRegister
 		}
