@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"lockbox/internal"
+	"lockbox/internal/app/auth/domain"
 	"lockbox/internal/config"
 	"lockbox/internal/http/response"
 	"lockbox/internal/idgen"
@@ -20,7 +21,7 @@ type JWTUser struct {
 }
 
 type TokenManager interface {
-	GenerateUserSession(ipAddress, userAgent, device string) (UserSession, error)
+	GenerateUserSession(ipAddress, userAgent, device string) (domain.UserSession, error)
 	GenerateAccessToken(userID int64) (string, error)
 	ValidateAccessToken(accessToken string) (*JWTUser, error)
 	GenerateSecureToken(byteSize int) (string, error)
@@ -45,13 +46,13 @@ func NewTokenManager(idgen idgen.IDGenerator, cfg *config.JWTConfig) TokenManage
 	}
 }
 
-func (m *tokenManager) GenerateUserSession(ipAddress, userAgent, device string) (UserSession, error) {
+func (m *tokenManager) GenerateUserSession(ipAddress, userAgent, device string) (domain.UserSession, error) {
 	secureToken, err := m.GenerateSecureToken(32)
 	if err != nil {
-		return UserSession{}, err
+		return domain.UserSession{}, err
 	}
 
-	return UserSession{
+	return domain.UserSession{
 		ID:               m.idgen.NewID(),
 		RefreshToken:     secureToken,
 		RefreshTokenHash: internal.HashString(secureToken),

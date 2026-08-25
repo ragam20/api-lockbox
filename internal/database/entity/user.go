@@ -3,7 +3,7 @@ package entity
 import (
 	"time"
 
-	"lockbox/internal/app/auth"
+	"lockbox/internal/app/auth/domain"
 )
 
 type UserEntity struct {
@@ -28,8 +28,8 @@ func (UserEntity) TableName() string {
 	return "users"
 }
 
-func (e UserEntity) ToDomainUser() auth.User {
-	return auth.User{
+func (e UserEntity) ToDomainUser() domain.User {
+	return domain.User{
 		ID:               e.ID,
 		Name:             e.Name,
 		Email:            e.Email,

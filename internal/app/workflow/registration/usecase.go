@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"lockbox/internal/app/auth"
+	authapp "lockbox/internal/app/auth/application"
+	authdomain "lockbox/internal/app/auth/domain"
 	"lockbox/internal/app/vault"
 	"lockbox/internal/cache"
 	dbtx "lockbox/internal/database/transaction"
@@ -19,12 +21,12 @@ import (
 )
 
 type Registration interface {
-	Execute(ctx context.Context, input auth.RegisterInput) (*auth.User, error)
+	Execute(ctx context.Context, input authapp.RegisterInput) (*authdomain.User, error)
 }
 
 type registration struct {
 	txManager    dbtx.TransactionManager
-	authRepo     auth.AuthRepository
+	authRepo     authdomain.AuthRepository
 	vaultRepo    vault.VaultRepository
 	cache        cache.Store
 	idGen        idgen.IDGenerator
@@ -33,7 +35,7 @@ type registration struct {
 
 func NewRegistration(
 	txManager dbtx.TransactionManager,
-	authRepo auth.AuthRepository,
+	authRepo authdomain.AuthRepository,
 	vaultRepo vault.VaultRepository,
 	cache cache.Store,
 	idGen idgen.IDGenerator,
@@ -49,7 +51,7 @@ func NewRegistration(
 	}
 }
 
-func (s *registration) Execute(ctx context.Context, input auth.RegisterInput) (*auth.User, error) {
+func (s *registration) Execute(ctx context.Context, input authapp.RegisterInput) (*authdomain.User, error) {
 	input.Email = normalizeEmail(input.Email)
 	input.Name = strings.TrimSpace(input.Name)
 	input.Session = strings.TrimSpace(input.Session)
@@ -77,7 +79,7 @@ func (s *registration) Execute(ctx context.Context, input auth.RegisterInput) (*
 		return nil, response.NewAppErr(http.StatusConflict, auth.ErrEmailAlreadyExists.Error(), "email already registered")
 	}
 
-	user := auth.User{
+	user := authdomain.User{
 		ID:               s.idGen.NewID(),
 		Email:            input.Email,
 		Name:             input.Name,
@@ -122,7 +124,7 @@ func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
 }
 
-func validateRegisterInput(input auth.RegisterInput) error {
+func validateRegisterInput(input authapp.RegisterInput) error {
 	if input.Session == "" {
 		return response.BadRequestError(auth.ErrSessionRequired.Error(), "register session is required")
 	}

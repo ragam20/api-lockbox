@@ -5,8 +5,11 @@ import (
 	"net/http"
 
 	"lockbox/internal/app/auth"
+	authapp "lockbox/internal/app/auth/application"
+	authrest "lockbox/internal/app/auth/delivery/rest"
 	"lockbox/internal/app/user"
 	"lockbox/internal/app/vault"
+
 	"lockbox/internal/app/workflow/registration"
 	updateargon "lockbox/internal/app/workflow/update_argon"
 	"lockbox/internal/cache"
@@ -49,37 +52,29 @@ func main() {
 		fx.Provide(
 			idgen.NewIDGen,
 			logger.NewLogger,
+
 			smtp.NewSMTPConfig,
 			smtp.NewMailService,
-			cloudinary.NewCloudinaryService,
-		),
-	)
 
-	databaseModule := fx.Module(
-		"database",
-		fx.Provide(
-			database.NewPostgresConnection,
-			dbtx.NewTransactionManager,
+			cloudinary.NewCloudinaryService,
+
 			cache.NewRedisClient,
 			cache.NewStore,
-		),
-	)
 
-	repositoryModule := fx.Module(
-		"repository",
-		fx.Provide(
+			database.NewPostgresConnection,
 			repository.NewAuthRepository,
 			repository.NewUserRepository,
 			repository.NewVaultRepository,
+			dbtx.NewTransactionManager,
 		),
 	)
 
 	authModule := fx.Module(
 		"auth",
 		fx.Provide(
+			authapp.NewAuthService,
+			authrest.NewAuthHandler,
 			auth.NewTokenManager,
-			auth.NewAuthService,
-			handler.NewAuthHandler,
 		),
 	)
 
@@ -107,7 +102,7 @@ func main() {
 		),
 	)
 
-	appHTTPModule := fx.Module(
+	httpModule := fx.Module(
 		"apphttp",
 		fx.Provide(
 			middleware.NewErrorMiddleware,
@@ -122,10 +117,8 @@ func main() {
 
 	app := fx.New(fx.Options(
 		configModule,
-		databaseModule,
 		infraModule,
-		appHTTPModule,
-		repositoryModule,
+		httpModule,
 
 		authModule,
 		userModule,

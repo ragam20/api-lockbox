@@ -1,4 +1,4 @@
-package auth
+package domain
 
 import "time"
 
@@ -22,37 +22,6 @@ type ArgonConfig struct {
 	Memory      uint32
 	Iterations  uint32
 	Parallelism uint32
-}
-
-type SendVerificationLinkInput struct {
-	Email string
-}
-
-type VerifyOTPInput struct {
-	Email     string
-	OTP       string
-	UserAgent string
-	IPAddress string
-	Device    string
-}
-
-type LoginInput struct {
-	Email    string
-	Verifier string
-}
-
-type RegisterInput struct {
-	Session          string
-	Email            string
-	Name             string
-	AuthVerifier     string
-	AuthVerifierSalt string
-	MasterKeySalt    string
-	VaultKeySalt     string
-}
-
-type VaultInput struct {
-	VaultKeySalt string
 }
 
 type UserSession struct {

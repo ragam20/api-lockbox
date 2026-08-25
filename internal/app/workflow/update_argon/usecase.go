@@ -3,10 +3,11 @@ package updateargon
 import (
 	"context"
 
-	"lockbox/internal/app/auth"
 	"lockbox/internal/app/vault"
 	dbtx "lockbox/internal/database/transaction"
 	"lockbox/internal/http/response"
+
+	authdomain "lockbox/internal/app/auth/domain"
 
 	"gorm.io/gorm"
 )
@@ -16,12 +17,12 @@ type UpdateArgonConfig interface {
 }
 
 type updateArgonConfig struct {
-	authRepo  auth.AuthRepository
+	authRepo  authdomain.AuthRepository
 	vaultRepo vault.VaultRepository
 	txManager dbtx.TransactionManager
 }
 
-func NewUpdateArgon(authRepo auth.AuthRepository, vaultRepo vault.VaultRepository, txManager dbtx.TransactionManager) UpdateArgonConfig {
+func NewUpdateArgon(authRepo authdomain.AuthRepository, vaultRepo vault.VaultRepository, txManager dbtx.TransactionManager) UpdateArgonConfig {
 	return &updateArgonConfig{
 		authRepo:  authRepo,
 		vaultRepo: vaultRepo,
