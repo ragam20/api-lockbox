@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"lockbox/internal/app/auth"
+	"lockbox/internal/app/workflow/registration"
 	"lockbox/internal/config"
 	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/request"
@@ -17,6 +18,7 @@ import (
 
 type AuthHandler struct {
 	authService   auth.AuthService
+	registration  registration.Registration
 	cookieManager *apphttp.CookieManager
 	jwtCfg        *config.JWTConfig
 	appConfig     *config.AppConfig
@@ -24,12 +26,14 @@ type AuthHandler struct {
 
 func NewAuthHandler(
 	authService auth.AuthService,
+	registration registration.Registration,
 	cookieManager *apphttp.CookieManager,
 	jwtCfg *config.JWTConfig,
 	appConfig *config.AppConfig,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:   authService,
+		registration:  registration,
 		cookieManager: cookieManager,
 		jwtCfg:        jwtCfg,
 		appConfig:     appConfig,
@@ -193,7 +197,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
-	user, err := h.authService.Register(c.Request.Context(), auth.RegisterInput{
+	user, err := h.registration.Execute(c.Request.Context(), auth.RegisterInput{
 		Session:          c.Query("session"),
 		Email:            req.Email,
 		Name:             req.Name,

@@ -5,9 +5,10 @@ import (
 	"net/http"
 
 	"lockbox/internal/app/auth"
-	"lockbox/internal/app/tools"
 	"lockbox/internal/app/user"
 	"lockbox/internal/app/vault"
+	"lockbox/internal/app/workflow/registration"
+	updateargon "lockbox/internal/app/workflow/update_argon"
 	"lockbox/internal/cache"
 	"lockbox/internal/config"
 	"lockbox/internal/database"
@@ -94,8 +95,15 @@ func main() {
 		"vault",
 		fx.Provide(
 			vault.NewVaultService,
-			tools.NewToolService,
 			handler.NewVaultHandler,
+		),
+	)
+
+	workflowsModule := fx.Module(
+		"workflows",
+		fx.Provide(
+			updateargon.NewUpdateArgon,
+			registration.NewRegistration,
 		),
 	)
 
@@ -118,9 +126,11 @@ func main() {
 		infraModule,
 		appHTTPModule,
 		repositoryModule,
+
 		authModule,
 		userModule,
 		vaultModule,
+		workflowsModule,
 
 		fx.Invoke(
 			func(_ *http.Server, _ *appHttp.CookieManager, _ *gorm.DB) {},

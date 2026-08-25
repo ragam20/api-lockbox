@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"lockbox/internal/app/tools"
 	"lockbox/internal/app/vault"
+	argonconfig "lockbox/internal/app/workflow/update_argon"
 	apphttp "lockbox/internal/http"
 	"lockbox/internal/http/request"
 	"lockbox/internal/http/response"
@@ -14,12 +14,12 @@ import (
 )
 
 type VaultHandler struct {
-	vaultService vault.VaultService
-	toolService  tools.ToolService
+	vaultService      vault.VaultService
+	updateArgonConfig argonconfig.UpdateArgonConfig
 }
 
-func NewVaultHandler(vaultService vault.VaultService, toolService tools.ToolService) *VaultHandler {
-	return &VaultHandler{vaultService: vaultService, toolService: toolService}
+func NewVaultHandler(vaultService vault.VaultService, updateArgonConfig argonconfig.UpdateArgonConfig) *VaultHandler {
+	return &VaultHandler{vaultService: vaultService, updateArgonConfig: updateArgonConfig}
 }
 
 func (h *VaultHandler) UpdateArgonConfig(c *gin.Context) {
@@ -44,7 +44,7 @@ func (h *VaultHandler) UpdateArgonConfig(c *gin.Context) {
 		})
 	}
 
-	err = h.toolService.UpdateArgonConfig(
+	err = h.updateArgonConfig.Execute(
 		c.Request.Context(),
 		vault.UpdateArgonConfigInput{
 			UserID:       userID,
