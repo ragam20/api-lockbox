@@ -40,7 +40,30 @@ func (m *mailService) SendOTP(email string, otp string) error {
 	msg.SetHeader("From", m.cfg.From)
 	msg.SetHeader("To", email)
 	msg.SetHeader("Subject", "Your Lockbox OTP code")
-	msg.SetBody("text/plain", fmt.Sprintf("Your Lockbox OTP code is %s. This code expires in 1 minute.", otp))
+
+	body := fmt.Sprintf(`
+		<!DOCTYPE html>
+		<html>
+		<body style="font-family: Arial, sans-serif;">
+			<h2>Lockbox OTP Verification</h2>
+			<p>Your OTP code is:</p>
+
+			<div style="
+				font-size: 32px;
+				font-weight: bold;
+				letter-spacing: 8px;
+				margin: 20px 0;
+			">
+				%s
+			</div>
+
+			<p>This code expires in <strong>1 minute</strong>.</p>
+			<p>If you did not request this code, you can safely ignore this email.</p>
+		</body>
+		</html>
+	`, otp)
+
+	msg.SetBody("text/html", body)
 
 	if err := m.cfg.Dialer.DialAndSend(msg); err != nil {
 		return response.InternalServerError("failed to send otp email")
