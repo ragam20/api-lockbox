@@ -1,4 +1,4 @@
-package user
+package domain
 
 import "time"
 
@@ -13,15 +13,4 @@ type User struct {
 	EmailVerified    bool
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-}
-
-type UpdateUserInput struct {
-	UserID int64
-	Name   string
-}
-
-type SaveAvatarURLInput struct {
-	UserID      int64
-	PublicImgID string
-	ImgURL      string
 }

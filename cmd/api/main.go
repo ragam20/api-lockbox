@@ -7,7 +7,10 @@ import (
 	"lockbox/internal/app/auth"
 	authapp "lockbox/internal/app/auth/application"
 	authrest "lockbox/internal/app/auth/delivery/rest"
-	"lockbox/internal/app/user"
+
+	userapp "lockbox/internal/app/user/application"
+	userrest "lockbox/internal/app/user/delivery/rest"
+
 	"lockbox/internal/app/vault"
 
 	"lockbox/internal/app/workflow/registration"
@@ -81,8 +84,8 @@ func main() {
 	userModule := fx.Module(
 		"user",
 		fx.Provide(
-			user.NewUserService,
-			handler.NewUserHandler,
+			userapp.NewUserService,
+			userrest.NewUserHandler,
 		),
 	)
 

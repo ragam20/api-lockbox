@@ -1,10 +1,11 @@
-package handler
+package rest
 
 import (
 	"net/http"
 
-	"lockbox/internal/app/user"
+	userapp "lockbox/internal/app/user/application"
 	apphttp "lockbox/internal/http"
+	"lockbox/internal/http/handler/helper"
 	"lockbox/internal/http/request"
 	"lockbox/internal/http/response"
 
@@ -12,17 +13,17 @@ import (
 )
 
 type UserHandler struct {
-	userService user.UserService
+	userService userapp.UserService
 }
 
-func NewUserHandler(userService user.UserService) *UserHandler {
+func NewUserHandler(userService userapp.UserService) *UserHandler {
 	return &UserHandler{
 		userService: userService,
 	}
 }
 
 func (h *UserHandler) RemoveAvatar(c *gin.Context) {
-	userID, err := userIDFromContext(c)
+	userID, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(response.Unauthorized())
 		return
@@ -38,7 +39,7 @@ func (h *UserHandler) RemoveAvatar(c *gin.Context) {
 }
 
 func (h *UserHandler) SaveAvatarURL(c *gin.Context) {
-	id, err := userIDFromContext(c)
+	id, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(response.Unauthorized())
 		return
@@ -50,7 +51,7 @@ func (h *UserHandler) SaveAvatarURL(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.SaveAvatarURL(c.Request.Context(), user.SaveAvatarURLInput{
+	if err := h.userService.SaveAvatarURL(c.Request.Context(), userapp.SaveAvatarURLInput{
 		UserID:      id,
 		PublicImgID: req.PublicImgID,
 		ImgURL:      req.ImgURL,
@@ -63,7 +64,7 @@ func (h *UserHandler) SaveAvatarURL(c *gin.Context) {
 }
 
 func (h *UserHandler) UploadAvatarPermission(c *gin.Context) {
-	id, err := userIDFromContext(c)
+	id, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(response.Unauthorized())
 		return
@@ -79,7 +80,7 @@ func (h *UserHandler) UploadAvatarPermission(c *gin.Context) {
 }
 
 func (h *UserHandler) UpdateProfile(c *gin.Context) {
-	id, err := userIDFromContext(c)
+	id, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(response.Unauthorized())
 		return
@@ -91,7 +92,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.UpdateProfile(c.Request.Context(), user.UpdateUserInput{
+	if err := h.userService.UpdateProfile(c.Request.Context(), userapp.UpdateUserInput{
 		UserID: id,
 		Name:   req.Name,
 	}); err != nil {
@@ -103,7 +104,7 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 }
 
 func (h *UserHandler) GetUser(c *gin.Context) {
-	id, err := userIDFromContext(c)
+	id, err := helper.UserIDFromContext(c)
 	if err != nil {
 		_ = c.Error(response.Unauthorized())
 		return
